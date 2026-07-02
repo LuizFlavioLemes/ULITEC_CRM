@@ -1,0 +1,62 @@
+# ═══════════════════════════════════════════════════════
+# ULITEC CRM — .gitignore
+# ═══════════════════════════════════════════════════════
+
+# ── Variáveis de ambiente (contém senhas e API keys) ──
+.env
+.env.*
+!.env.example
+
+# ── Banco de dados SQLite ──
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Cache Python ──
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+
+# ── Backups e exports gerados pelo sistema ──
+backups/
+backup/
+exports/
+
+# ── Logs ──
+logs/
+*.log
+
+# ── Uploads e temporários ──
+uploads/
+temp/
+tmp/
+
+# ── IDE e editor ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Arquivos do sistema operacional ──
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Arquivos de integração (dados brutos, não código) ──
+relatórios para integração/
+
+# ── Ambiente virtual Python ──
+venv/
+env/
+.venv/
+virtualenv/
+
+# ── Arquivos de lock (gerados por pip) ──
+pip-wheel-metadata/
