@@ -31,6 +31,22 @@ if app_dir not in sys.path:
 # ── Definir working directory como raiz do projeto ──
 os.chdir(app_dir)
 
+# ── Bootstrap único (ANTES de qualquer import do app) ──
+# Garante: .env, WAL, schema, monkey-patch sqlite3.connect
+try:
+    import utils.bootstrap  # noqa: F401
+except ImportError as e:
+    import traceback
+    _bootstrap_error = f"Erro no bootstrap: {e}\n{traceback.format_exc()}"
+    def application(environ, start_response):
+        status = "500 Internal Server Error"
+        headers = [("Content-Type", "text/plain; charset=utf-8")]
+        start_response(status, headers)
+        return [_bootstrap_error.encode("utf-8")]
+    # Aborta — sem bootstrap, app não pode rodar
+    import sys as _sys
+    _sys.exit(1)
+
 # ── Importar módulo principal do Streamlit ──
 # O Passenger mantém o processo vivo entre requisições
 # O Streamlit gerencia seu próprio servidor internamente

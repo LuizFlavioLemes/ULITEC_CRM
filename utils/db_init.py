@@ -1,27 +1,35 @@
+"""
+garantir_schema(db_path)
+───────────────────────
+Inicialização defensiva do schema SQLite antes de qualquer página rodar.
+Garante que TODAS as tabelas e colunas críticas existam no .db,
+evitando crashes em produção por schema ausente.
+"""
+
 import sqlite3
+import os
 
-from config import DB_PATH
 
+def garantir_schema(db_path: str):
+    """Cria tabelas faltantes e adiciona colunas críticas se ausentes."""
 
-def init_connection():
-    """Configura PRAGMAs recomendados para performance e segurança."""
-    conn = sqlite3.connect(str(DB_PATH))
+    # Se o arquivo .db não existe, sqlite3.connect já cria. Mas se o
+    # diretório não existir, criamos.
+    db_dir = os.path.dirname(db_path)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+
+    conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
-    conn.close()
+    cur = conn.cursor()
 
+    # ──────────────────────────────────────────────────
+    # CREATE TABLE IF NOT EXISTS (todas as tabelas do sistema)
+    # ──────────────────────────────────────────────────
 
-def criar_banco():
-
-    conn = sqlite3.connect(str(DB_PATH))
-    cursor = conn.cursor()
-
-    # ==================================================
-    # UNIDADES
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS unidades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL,
@@ -31,11 +39,7 @@ def criar_banco():
     )
     """)
 
-    # ==================================================
-    # FATURAMENTO ITENS
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS faturamento_itens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente_id INTEGER,
@@ -49,11 +53,7 @@ def criar_banco():
     )
     """)
 
-    # ==================================================
-    # USUARIOS
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL,
@@ -65,44 +65,36 @@ def criar_banco():
     )
     """)
 
-    # ==================================================
-    # CLIENTES
-    # ==================================================
-
-    cursor.execute("""
-CREATE TABLE IF NOT EXISTS clientes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    codigo_erp TEXT UNIQUE,
-    razao_social TEXT,
-    nome_fantasia TEXT,
-    cnpj TEXT,
-    cidade TEXT,
-    estado TEXT,
-    telefone TEXT,
-    email TEXT,
-    segmento TEXT,
-    parque_maquinas INTEGER DEFAULT 0,
-    maquinas_mitsubishi INTEGER DEFAULT 0,
-    frequencia_visita INTEGER DEFAULT 90,
-    tipo_conta TEXT DEFAULT 'LEAD FRIO',
-    classe_abc TEXT DEFAULT 'D',
-    faturamento_12m REAL DEFAULT 0,
-    ultima_visita DATE,
-    ultimo_faturamento DATE,
-    origem_erp TEXT,
-    observacoes TEXT,
-    ultima_importacao DATE,
-    status TEXT DEFAULT 'ATIVO',
-    data_cadastro DATE DEFAULT (date('now')),
-    origem_cadastro TEXT DEFAULT 'IMPORTACAO_CLIENTES'
-)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS clientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        codigo_erp TEXT UNIQUE,
+        razao_social TEXT,
+        nome_fantasia TEXT,
+        cnpj TEXT,
+        cidade TEXT,
+        estado TEXT,
+        telefone TEXT,
+        email TEXT,
+        segmento TEXT,
+        parque_maquinas INTEGER DEFAULT 0,
+        maquinas_mitsubishi INTEGER DEFAULT 0,
+        frequencia_visita INTEGER DEFAULT 90,
+        tipo_conta TEXT DEFAULT 'LEAD FRIO',
+        classe_abc TEXT DEFAULT 'D',
+        faturamento_12m REAL DEFAULT 0,
+        ultima_visita DATE,
+        ultimo_faturamento DATE,
+        origem_erp TEXT,
+        observacoes TEXT,
+        ultima_importacao DATE,
+        status TEXT DEFAULT 'ATIVO',
+        data_cadastro DATE DEFAULT (date('now')),
+        origem_cadastro TEXT DEFAULT 'IMPORTACAO_CLIENTES'
+    )
     """)
 
-    # ==================================================
-    # INTERACOES
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS interacoes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente_id INTEGER,
@@ -124,7 +116,6 @@ CREATE TABLE IF NOT EXISTS clientes (
         proxima_acao TEXT,
         data_proxima_acao DATE,
         status_interacao TEXT DEFAULT 'ABERTA',
-        -- v1.0.5: contato e próxima ação estruturada
         contato_nome TEXT,
         contato_cargo TEXT,
         contato_telefone TEXT,
@@ -134,11 +125,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # PROPOSTAS
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS propostas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         numero_os TEXT,
@@ -155,11 +142,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # ORDENS DE SERVICO / PIPELINE
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS ordens_servico (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         numero_os TEXT UNIQUE,
@@ -188,11 +171,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # FATURAMENTO
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS faturamento (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente_id INTEGER,
@@ -204,11 +183,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # MAQUINAS MITSUBISHI
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS maquinas_mitsubishi (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         customer TEXT,
@@ -229,11 +204,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # CONCILIACAO MITSUBISHI
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS conciliacao_mitsubishi (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         maquina_id INTEGER,
@@ -245,11 +216,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # OPORTUNIDADES
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS oportunidades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente_id INTEGER,
@@ -262,11 +229,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # ALERTAS
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS alertas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tipo TEXT,
@@ -276,11 +239,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # CONFIGURACOES
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS configuracoes (
         chave TEXT PRIMARY KEY,
         valor TEXT,
@@ -288,11 +247,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # PENDENCIAS COMERCIAIS (Módulo Relacionamento Comercial v1.0.3)
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS pendencias_comerciais (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente_id INTEGER,
@@ -308,11 +263,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # TABELA DE EVOLUCOES DE PENDENCIAS (v1.3)
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS evolucao_pendencias (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         pendencia_id INTEGER NOT NULL,
@@ -326,11 +277,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # TABELAS DO MODULO BASE DE PRODUTOS IMPORTADOS
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS tipo_produto_importado (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         descricao TEXT NOT NULL UNIQUE,
@@ -343,7 +290,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS ncm_importacao (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ncm TEXT NOT NULL UNIQUE,
@@ -356,7 +303,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS config_importacao (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chave TEXT NOT NULL UNIQUE,
@@ -365,7 +312,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS produtos_importados (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         modelo TEXT NOT NULL UNIQUE,
@@ -386,7 +333,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS fornecedores_produto (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL UNIQUE,
@@ -398,7 +345,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS produtos_importados_fornecedores (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         produto_id INTEGER NOT NULL,
@@ -414,7 +361,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS produtos_importados_historico (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         produto_id INTEGER,
@@ -429,11 +376,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # TABELAS DO MODULO GESTAO DE TERCEIROS (v1.8.0)
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS terceiros_fornecedores (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL UNIQUE,
@@ -448,7 +391,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS terceiros_servicos_tipos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL UNIQUE,
@@ -458,7 +401,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS terceiros_marcas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL UNIQUE,
@@ -467,7 +410,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS terceiros_servicos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         fornecedor_id INTEGER NOT NULL,
@@ -483,7 +426,6 @@ CREATE TABLE IF NOT EXISTS clientes (
         usuario TEXT DEFAULT '',
         data_cadastro DATE DEFAULT (date('now')),
         ultima_atualizacao DATE DEFAULT (date('now')),
-        -- campos preparados para expansao futura
         os_erp TEXT DEFAULT NULL,
         cliente_id INTEGER DEFAULT NULL,
         equipamento_id INTEGER DEFAULT NULL,
@@ -496,11 +438,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # TABELAS DO MODULO IA
-    # ==================================================
-
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS config_ia (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         api_key TEXT,
@@ -511,7 +449,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    cursor.execute("""
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS relatorios_ia (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente_id INTEGER,
@@ -524,178 +462,58 @@ CREATE TABLE IF NOT EXISTS clientes (
     )
     """)
 
-    # ==================================================
-    # UNIDADES PADRAO
-    # ==================================================
+    # ──────────────────────────────────────────────────
+    # ALTER TABLE defensivo — colunas críticas
+    # ──────────────────────────────────────────────────
 
-    cursor.execute("""
-    INSERT OR IGNORE INTO unidades
-    (id, nome, sigla, cidade, estado)
-    VALUES
-    (1, 'ULITEC SP', 'SP', 'Jundiaí', 'SP')
+    _add_column_if_missing(cur, "fornecedores_produto", "ativo", "INTEGER DEFAULT 1")
+    _add_column_if_missing(cur, "fornecedores_produto", "criado_em", "DATE DEFAULT (date('now'))")
+    _add_column_if_missing(cur, "fornecedores_produto", "atualizado_em", "DATE DEFAULT (date('now'))")
+
+    _add_column_if_missing(cur, "ordens_servico", "tecnico", "TEXT DEFAULT ''")
+
+    _add_column_if_missing(cur, "clientes", "status", "TEXT DEFAULT 'ATIVO'")
+    _add_column_if_missing(cur, "clientes", "data_cadastro", "DATE DEFAULT (date('now'))")
+    _add_column_if_missing(cur, "clientes", "origem_cadastro", "TEXT DEFAULT 'IMPORTACAO_CLIENTES'")
+
+    _add_column_if_missing(cur, "usuarios", "senha_hash", "TEXT")
+    _add_column_if_missing(cur, "usuarios", "ultimo_login", "TEXT")
+    _add_column_if_missing(cur, "usuarios", "login", "TEXT")
+    _add_column_if_missing(cur, "usuarios", "perfil", "TEXT DEFAULT 'OPERADOR'")
+    _add_column_if_missing(cur, "usuarios", "unidade_id", "INTEGER")
+    _add_column_if_missing(cur, "usuarios", "ativo", "INTEGER DEFAULT 1")
+
+    _add_column_if_missing(cur, "interacoes", "assunto", "TEXT")
+    _add_column_if_missing(cur, "interacoes", "resultado", "TEXT")
+    _add_column_if_missing(cur, "interacoes", "usuario_id", "INTEGER")
+    _add_column_if_missing(cur, "interacoes", "status_interacao", "TEXT DEFAULT 'ABERTA'")
+    _add_column_if_missing(cur, "interacoes", "contato_nome", "TEXT")
+    _add_column_if_missing(cur, "interacoes", "contato_cargo", "TEXT")
+    _add_column_if_missing(cur, "interacoes", "contato_telefone", "TEXT")
+    _add_column_if_missing(cur, "interacoes", "contato_email", "TEXT")
+    _add_column_if_missing(cur, "interacoes", "tipo_prox_acao", "TEXT")
+    _add_column_if_missing(cur, "interacoes", "obs_prox_acao", "TEXT")
+
+    # ──────────────────────────────────────────────────
+    # Inserções padrão (idempotentes)
+    # ──────────────────────────────────────────────────
+
+    cur.execute("""
+    INSERT OR IGNORE INTO unidades (id, nome, sigla, cidade, estado)
+    VALUES (1, 'ULITEC SP', 'SP', 'Jundiaí', 'SP')
     """)
-
-    cursor.execute("""
-    INSERT OR IGNORE INTO unidades
-    (id, nome, sigla, cidade, estado)
-    VALUES
-    (2, 'ULITEC RS', 'RS', 'Caxias do Sul', 'RS')
+    cur.execute("""
+    INSERT OR IGNORE INTO unidades (id, nome, sigla, cidade, estado)
+    VALUES (2, 'ULITEC RS', 'RS', 'Caxias do Sul', 'RS')
     """)
-
-    # ==================================================
-    # TIPOS DE PRODUTO PADRAO
-    # ==================================================
-
-    tipos_iniciais = [
-        ('ENCODER', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('MOTOR', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('SERVO DRIVE', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('SPINDLE DRIVE', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('FONTE', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('PLACA CNC', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('CNC', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('CABO', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('VENTILADOR', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('BATERIA', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('CONECTOR', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('MONITOR', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('TECLADO', 12.60, 3.25, 2.10, 10.25, 18.00),
-        ('OUTROS', 12.60, 3.25, 2.10, 10.25, 18.00),
-    ]
-
-    for t in tipos_iniciais:
-        cursor.execute("""
-        INSERT OR IGNORE INTO tipo_produto_importado
-        (descricao, ii, ipi, pis, cofins, icms, ativo)
-        VALUES (?, ?, ?, ?, ?, ?, 1)
-        """, t)
-
-    # ==================================================
-    # NCMS PADRAO
-    # ==================================================
-
-    ncms_iniciais = [
-        ('84145910', 'Ventilador até 90cm²', 'VENTILADOR'),
-        ('84145990', 'Ventilador acima 90cm²', 'VENTILADOR'),
-        ('84716052', 'Teclados', 'TECLADO'),
-        ('84716053', 'Mouse / Apontadores', 'OUTROS'),
-        ('85015190', 'Motores abaixo 750W', 'MOTOR'),
-        ('85015290', 'Motores acima 750W', 'MOTOR'),
-        ('85044050', 'Acionamentos Servo/Spindle', 'SERVO DRIVE'),
-        ('85044090', 'Fonte Família CV', 'FONTE'),
-        ('85045000', 'Filtros e Bobinas', 'OUTROS'),
-        ('85049040', 'Placa Conversores', 'PLACA CNC'),
-        ('85065010', 'Bateria de Lítio', 'BATERIA'),
-        ('85182990', 'Alto Falante', 'OUTROS'),
-        ('85234920', 'Compact Disk', 'OUTROS'),
-        ('85235110', 'Cartão Memória', 'OUTROS'),
-        ('85249100', 'Monitor Colorido', 'MONITOR'),
-        ('85299020', 'Backlight', 'OUTROS'),
-        ('85322200', 'Capacitor Eletrolítico', 'OUTROS'),
-        ('85366910', 'Conectores', 'CONECTOR'),
-        ('85371011', 'CNC com Monitor', 'CNC'),
-        ('85371019', 'CNC sem Monitor', 'CNC'),
-        ('85389010', 'Placas CNC', 'PLACA CNC'),
-        ('85412920', 'Transistor IGBT', 'OUTROS'),
-        ('85444200', 'Cabos com Conectores', 'CABO'),
-        ('85447010', 'Fibra Óptica', 'CABO'),
-        ('90318099', 'Encoder', 'ENCODER'),
-        ('84717012', 'Hard Disk', 'OUTROS'),
-    ]
-
-    for ncm, descricao, tipo_nome in ncms_iniciais:
-        cursor.execute("""
-        INSERT OR IGNORE INTO ncm_importacao (ncm, descricao, tipo_produto_id)
-        SELECT ?, ?, tp.id FROM tipo_produto_importado tp WHERE tp.descricao = ?
-        """, (ncm, descricao, tipo_nome))
-
-    # ==================================================
-    # CONFIGURACOES PADRAO IMPORTACAO
-    # ==================================================
-
-    configs_iniciais = [
-        ('dolar_atual', 5.80, 'Dólar atual para cálculos'),
-        ('rateio_frete_usd', 50.0, 'Rateio de frete por produto em USD'),
-        ('despesas_aduaneiras_brl', 200.0, 'Despesas aduaneiras em R$'),
-        ('markup_padrao', 2.0, 'Markup padrão para preço de venda'),
-    ]
-
-    for chave, valor, descricao in configs_iniciais:
-        cursor.execute("""
-        INSERT OR IGNORE INTO config_importacao
-        (chave, valor, descricao)
-        VALUES (?, ?, ?)
-        """, (chave, valor, descricao))
-
-    # ==================================================
-    # MIGRACAO: adicionar colunas para cliente provisorio
-    # ==================================================
-    for coluna in ['status', 'data_cadastro', 'origem_cadastro']:
-        try:
-            cursor.execute(f"ALTER TABLE clientes ADD COLUMN {coluna} TEXT")
-        except sqlite3.OperationalError:
-            pass  # coluna ja existe
-
-    try:
-        cursor.execute("UPDATE clientes SET status = 'ATIVO' WHERE status IS NULL")
-    except sqlite3.OperationalError:
-        pass
-
-    # ==================================================
-    # MIGRACAO v1.0.3: novas colunas na tabela interacoes
-    # ==================================================
-    for coluna_mig in [
-        ('assunto', 'TEXT'),
-        ('resultado', 'TEXT'),
-        ('usuario_id', 'INTEGER'),
-        ('status_interacao', 'TEXT DEFAULT \'ABERTA\''),
-    ]:
-        try:
-            cursor.execute(f"ALTER TABLE interacoes ADD COLUMN {coluna_mig[0]} {coluna_mig[1]}")
-        except sqlite3.OperationalError:
-            pass
-
-    # ==================================================
-    # MIGRACAO v1.0.5: colunas de contato e próx. ação
-    # ==================================================
-    for coluna_mig in [
-        ('contato_nome', 'TEXT'),
-        ('contato_cargo', 'TEXT'),
-        ('contato_telefone', 'TEXT'),
-        ('contato_email', 'TEXT'),
-        ('tipo_prox_acao', 'TEXT'),
-        ('obs_prox_acao', 'TEXT'),
-    ]:
-        try:
-            cursor.execute(f"ALTER TABLE interacoes ADD COLUMN {coluna_mig[0]} {coluna_mig[1]}")
-        except sqlite3.OperationalError:
-            pass
-
-    # Renomear coluna antiga 'status' para 'status_interacao' se existir
-    try:
-        colunas_inter = [row[1] for row in cursor.execute("PRAGMA table_info(interacoes)").fetchall()]
-        if 'status' in colunas_inter and 'status_interacao' not in colunas_inter:
-            cursor.execute("ALTER TABLE interacoes RENAME COLUMN status TO status_interacao")
-    except sqlite3.OperationalError:
-        pass
-
-    # Migrar dados da tabela antiga pendencias -> pendencias_comerciais
-    try:
-        cursor.execute("SELECT COUNT(*) FROM pendencias")
-        if cursor.fetchone()[0] > 0:
-            cursor.execute("""
-                INSERT INTO pendencias_comerciais (cliente_id, interacao_id, descricao, prioridade, responsavel, data_limite, status, criado_em)
-                SELECT cliente_id, interacao_id, descricao, prioridade, responsavel, data_limite, status, criado_em FROM pendencias
-            """)
-        cursor.execute("DROP TABLE IF EXISTS pendencias")
-    except sqlite3.OperationalError:
-        pass
 
     conn.commit()
     conn.close()
 
-    print("Banco ULITEC criado com sucesso!")
 
-
-if __name__ == "__main__":
-    criar_banco()
+def _add_column_if_missing(cur, table: str, column: str, col_def: str):
+    """Adiciona coluna se não existir, ignorando erro silenciosamente."""
+    try:
+        cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_def}")
+    except sqlite3.OperationalError:
+        pass  # coluna já existe

@@ -1,10 +1,10 @@
-from dotenv import load_dotenv
-load_dotenv(override=True)
+import utils.bootstrap  # noqa: F401 — bootstrap único: .env, WAL, schema, monkey-patch sqlite3.connect
 
 import streamlit as st
 
 from auth import init_auth, mostrar_login, sidebar_usuario
 from permissions import pode_selecionar_unidade
+from config import DB_PATH
 
 st.set_page_config(
     page_title="CRM Industrial ULITEC",
