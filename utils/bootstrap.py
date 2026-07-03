@@ -75,7 +75,7 @@ def _init_database():
             assunto TEXT, responsavel TEXT, usuario_id INTEGER, unidade TEXT,
             qtd_maquinas INTEGER, qtd_mitsubishi INTEGER, brinde_entregue TEXT,
             status_cliente TEXT, nivel_producao TEXT, perspectiva_6m TEXT,
-            concorrentes TEXT, resumo TEXT, resultado TEXT, proxima_acao TEXT,
+            concorrentes TEXT, resultado_comercial TEXT, resumo TEXT, resultado TEXT, proxima_acao TEXT,
             data_proxima_acao DATE, status_interacao TEXT DEFAULT 'ABERTA',
             contato_nome TEXT, contato_cargo TEXT, contato_telefone TEXT,
             contato_email TEXT, tipo_prox_acao TEXT, obs_prox_acao TEXT)""",
@@ -265,6 +265,7 @@ def _init_database():
     _add_col(cur, "interacoes", "contato_email", "TEXT")
     _add_col(cur, "interacoes", "tipo_prox_acao", "TEXT")
     _add_col(cur, "interacoes", "obs_prox_acao", "TEXT")
+    _add_col(cur, "interacoes", "resultado_comercial", "TEXT")
 
     # ── Renomear coluna 'status' → 'status_interacao' se necessário ──
     try:
