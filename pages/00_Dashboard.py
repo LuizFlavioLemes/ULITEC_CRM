@@ -50,6 +50,12 @@ faturamento = pd.read_sql_query(
 
 conn.close()
 
+# ── Guarda contra banco vazio (sem dados para exibir) ──
+if len(clientes) == 0:
+    st.warning("📭 Nenhum dado encontrado. Importe clientes e faturamento para visualizar o Dashboard.")
+    st.info("Acesse **Centro de Importações** no menu lateral para começar.")
+    st.stop()
+
 # =====================================================
 # FILTROS
 # =====================================================

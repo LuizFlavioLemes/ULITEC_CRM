@@ -14,7 +14,13 @@ def formatar_clientes_para_select(df):
       - lista_formatada: list[str] com rótulos "RAZAO SOCIAL - Cidade/UF"
       - dict_formatado: dict mapeando rótulo -> id do cliente
       - dict_reverso: dict mapeando rótulo -> dict com dados do cliente
+
+    Se o DataFrame estiver vazio (banco novo), retorna listas e dicts vazios sem erro.
     """
+    # ── Tratar DataFrame vazio (banco novo sem clientes) ──
+    if df is None or df.empty:
+        return [], {}, {}
+
     df = df.copy()
 
     if "codigo_erp" in df.columns and df["codigo_erp"].notna().any():

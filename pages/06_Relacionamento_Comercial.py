@@ -93,6 +93,13 @@ df_clientes = pd.read_sql_query(
 )
 clientes_lista, clientes_dict, clientes_reverso = formatar_clientes_para_select(df_clientes)
 
+# ── Guarda contra banco vazio (sem clientes cadastrados) ──
+BANCO_VAZIO = len(clientes_lista) == 0
+if BANCO_VAZIO:
+    clientes_lista = ["Nenhum cliente cadastrado"]
+    clientes_dict = {}
+    clientes_reverso = {}
+
 conn.close()
 
 # =====================================================
