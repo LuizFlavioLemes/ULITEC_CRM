@@ -243,6 +243,7 @@ def _init_database():
     _add_col(cur, "fornecedores_produto", "criado_em", "DATE DEFAULT (date('now'))")
     _add_col(cur, "fornecedores_produto", "atualizado_em", "DATE DEFAULT (date('now'))")
     _add_col(cur, "ordens_servico", "tecnico", "TEXT DEFAULT ''")
+    _add_col(cur, "ordens_servico", "valor_faturado", "REAL DEFAULT 0")
     _add_col(cur, "clientes", "status", "TEXT DEFAULT 'ATIVO'")
     _add_col(cur, "clientes", "data_cadastro", "DATE DEFAULT (date('now'))")
     _add_col(cur, "clientes", "origem_cadastro", "TEXT DEFAULT 'IMPORTACAO_CLIENTES'")
