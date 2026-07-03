@@ -46,25 +46,29 @@ def init_auth():
 
     # ── Migrar nivel_acesso → perfil (VERSÃO CORRIGIDA V2.0) ──
     # Mapeia nivel_acesso legado para os novos perfis padronizados
-    cursor.execute(
-        """
-        UPDATE usuarios
-        SET perfil = CASE nivel_acesso
-            WHEN 'SÓCIO' THEN 'SÓCIO'
-            WHEN 'GERENTE' THEN 'GERENTE'
-            WHEN 'GESTOR' THEN 'GERENTE'
-            WHEN 'OPERADOR SP' THEN 'OPERADOR'
-            WHEN 'OPERADOR RS' THEN 'OPERADOR'
-            WHEN 'SOCIO' THEN 'SÓCIO'
-            ELSE perfil
-        END,
-        perfil_migrado_v2 = 1
-        WHERE (perfil_migrado_v2 IS NULL OR perfil_migrado_v2 = 0)
-          AND nivel_acesso IS NOT NULL
-          AND nivel_acesso != ''
-        """
-    )
-    conn.commit()
+    # try/except: coluna nivel_acesso pode não existir em bases novas (Streamlit Cloud)
+    try:
+        cursor.execute(
+            """
+            UPDATE usuarios
+            SET perfil = CASE nivel_acesso
+                WHEN 'SÓCIO' THEN 'SÓCIO'
+                WHEN 'GERENTE' THEN 'GERENTE'
+                WHEN 'GESTOR' THEN 'GERENTE'
+                WHEN 'OPERADOR SP' THEN 'OPERADOR'
+                WHEN 'OPERADOR RS' THEN 'OPERADOR'
+                WHEN 'SOCIO' THEN 'SÓCIO'
+                ELSE perfil
+            END,
+            perfil_migrado_v2 = 1
+            WHERE (perfil_migrado_v2 IS NULL OR perfil_migrado_v2 = 0)
+              AND nivel_acesso IS NOT NULL
+              AND nivel_acesso != ''
+            """
+        )
+        conn.commit()
+    except Exception:
+        pass  # coluna nivel_acesso não existe — base nova, sem migração necessária
 
     # ── Migrar perfis que estão com valor SOCIO (sem acento) para SÓCIO ──
     cursor.execute(

@@ -251,6 +251,8 @@ def _init_database():
     _add_col(cur, "usuarios", "perfil", "TEXT DEFAULT 'OPERADOR'")
     _add_col(cur, "usuarios", "unidade_id", "INTEGER")
     _add_col(cur, "usuarios", "ativo", "INTEGER DEFAULT 1")
+    _add_col(cur, "usuarios", "nivel_acesso", "TEXT")
+    _add_col(cur, "usuarios", "perfil_migrado_v2", "INTEGER DEFAULT 0")
     _add_col(cur, "interacoes", "assunto", "TEXT")
     _add_col(cur, "interacoes", "resultado", "TEXT")
     _add_col(cur, "interacoes", "usuario_id", "INTEGER")

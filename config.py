@@ -66,6 +66,14 @@ TIMEZONE = "America/Sao_Paulo"
 # ═══════════════════════════════════════════════════════════
 
 MASTER_PASSWORD = os.getenv("MASTER_PASSWORD", "")
+
+# ── Fallback para Streamlit Cloud: tenta ler de st.secrets se disponível ──
+if not MASTER_PASSWORD:
+    try:
+        import streamlit as st
+        MASTER_PASSWORD = st.secrets.get("MASTER_PASSWORD", "")
+    except Exception:
+        pass  # st.secrets não disponível (não estamos no Streamlit Cloud)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
