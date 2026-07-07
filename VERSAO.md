@@ -1,6 +1,24 @@
 # ULITEC CRM
 
-**Versão 1.0.3**
+**Versão 1.0.4**
+
+---
+
+## 🆕 v1.0.4 — Backup Portátil Exportável (07/07/2026)
+
+### Novas Funcionalidades
+- **Backup Portátil Exportável**: Geração de backup completo em ZIP com manifesto JSON, hash SHA256 e download direto pelo navegador
+- **Restauração por Upload**: Upload de arquivo ZIP de backup com validação automática (manifesto, hash, schema, tabelas)
+- Novas funções em `services/admin_sistema.py`: `gerar_backup_zip_bytes`, `processar_arquivo_enviado`, `executar_restauracao_upload`, `limpar_temporarios_restauracao`
+- Bloqueio de acesso às abas Backup e Restauração para usuários não-MASTER
+
+### Melhorias
+- Aba "💾 Backup" reformulada: botão "Gerar e Baixar Backup" com métricas (tamanho, registros, tabelas, hash) e download button
+- Aba "🔄 Restauração" migrada para fluxo de upload com validação completa (manifesto JSON, hash SHA256, integridade SQLite)
+- Seção legado de restauração movida para expander colapsável
+
+### Correções
+- Correções de importação: funções novas adicionadas ao `from services.admin_sistema import`
 
 ---
 

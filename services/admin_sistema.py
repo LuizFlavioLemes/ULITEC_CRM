@@ -16,22 +16,23 @@ import json
 import os
 import shutil
 import sqlite3
+import tempfile
 import time as time_module
 import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 # ============================================================
 # CONSTANTES
 # ============================================================
 
 from config import DB_PATH
+from services.version import VERSION as CRM_VERSION, BUILD
 
 BACKUP_DIR = Path("backups")
 EXPORT_DIR = Path("backups/export")
 MANIFEST_DIR = Path("backups/manifestos")
-CRM_VERSION = "1.0.3"
 DB_VERSION = "1.0.3"
 
 # Tabelas operacionais (resetáveis)
@@ -1657,6 +1658,506 @@ def criar_backup_automatico_pre_restauracao() -> dict:
             "sucesso": False,
             "erro": str(e),
         }
+
+
+# ============================================================
+# BLOCO 10 - BACKUP PORTÁTIL (DOWNLOAD) e RESTAURAÇÃO POR UPLOAD
+# ============================================================
+# Substitui a dependência de diretórios fixos do servidor.
+# O usuário faz download do backup e upload para restaurar.
+
+def gerar_backup_zip_bytes() -> Tuple[bytes, dict]:
+    """
+    Gera backup portátil do banco com manifesto em memória.
+    
+    Retorna:
+        (bytes do ZIP, dict com metadados)
+    
+    O ZIP contém:
+        - crm.db (cópia consistente do banco)
+        - manifesto.json (metadados completos)
+    
+    Não salva em disco obrigatoriamente.
+    Os bytes podem ser usados diretamente com st.download_button().
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    nome_zip = f"backup_ULITEC_{timestamp}.zip"
+    
+    # Obter metadados do banco atual
+    status = obter_status_sistema()
+    
+    # Calcular hash SHA256 do banco
+    sha256_hash = hashlib.sha256()
+    with open(str(DB_PATH), "rb") as f:
+        for bloco in iter(lambda: f.read(65536), b""):
+            sha256_hash.update(bloco)
+    hash_banco = sha256_hash.hexdigest()
+    
+    # Obter schema version do banco
+    conn = sqlite3.connect(str(DB_PATH))
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA schema_version")
+    schema_version = cursor.fetchone()[0]
+    conn.close()
+    
+    # Montar manifesto completo
+    manifesto = {
+        "sistema": "ULITEC CRM",
+        "versao_crm": CRM_VERSION,
+        "build": BUILD,
+        "db_version": status["db_version"],
+        "schema_version": schema_version,
+        "data": datetime.now().strftime("%Y-%m-%d"),
+        "hora": datetime.now().strftime("%H:%M:%S"),
+        "timestamp": timestamp,
+        "quantidade_tabelas": status["total_tabelas"],
+        "quantidade_registros": status["total_registros"],
+        "tamanho_bytes": status["tamanho_bytes"],
+        "tamanho_kb": status["tamanho_kb"],
+        "tamanho_mb": status["tamanho_mb"],
+        "hash_sha256": hash_banco,
+        "tabelas": list(status["info_tabelas"].keys()),
+        "registros_por_tabela": status["info_tabelas"],
+    }
+    
+    # Criar ZIP em memória
+    zip_buffer = tempfile.SpooledTemporaryFile(max_size=100 * 1024 * 1024)  # 100MB max
+    try:
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            # Adicionar banco
+            zf.write(str(DB_PATH), "crm.db")
+            
+            # Adicionar manifesto
+            zf.writestr(
+                "manifesto.json",
+                json.dumps(manifesto, indent=2, ensure_ascii=False).encode("utf-8"),
+            )
+        
+        zip_buffer.seek(0)
+        zip_bytes = zip_buffer.read()
+    finally:
+        zip_buffer.close()
+    
+    metadados = {
+        "nome_arquivo": nome_zip,
+        "tamanho_bytes": len(zip_bytes),
+        "tamanho_kb": round(len(zip_bytes) / 1024, 2),
+        "tamanho_mb": round(len(zip_bytes) / 1024 / 1024, 2),
+        "timestamp": timestamp,
+        "hash_sha256": hash_banco,
+        "tabelas": status["total_tabelas"],
+        "registros": status["total_registros"],
+        "manifesto": manifesto,
+    }
+    
+    # Opcional: salvar cópia local para histórico
+    try:
+        BACKUP_DIR.mkdir(exist_ok=True)
+        destino_local = BACKUP_DIR / nome_zip
+        destino_local.write_bytes(zip_bytes)
+        metadados["copia_local"] = str(destino_local)
+    except Exception:
+        metadados["copia_local"] = None
+    
+    # Registrar no banco
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.execute(
+            """INSERT INTO configuracoes (chave, valor, descricao)
+               VALUES (?, ?, ?)
+               ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor""",
+            ("ultimo_backup", timestamp, f"Último backup: {nome_zip}"),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+    
+    return zip_bytes, metadados
+
+
+def processar_arquivo_enviado(file_bytes: bytes, nome_original: str) -> dict:
+    """
+    Processa um arquivo enviado pelo usuário para restauração.
+    
+    Aceita:
+        - .zip (contendo crm.db + manifesto.json opcional)
+        - .db (banco SQLite direto)
+    
+    Retorna dict com:
+        - valido: bool
+        - erros: list
+        - resumo: dict (informações para exibição ao usuário)
+        - dados_banco: bytes (bytes do banco SQLite extraído/validado)
+        - temp_dir: Path (diretório temporário a ser limpo depois)
+    """
+    resultado = {
+        "valido": False,
+        "erros": [],
+        "resumo": {},
+        "dados_banco": None,
+        "temp_dir": None,
+        "manifesto": None,
+    }
+    
+    # Validar extensão
+    sufixo = Path(nome_original).suffix.lower()
+    if sufixo not in (".zip", ".db"):
+        resultado["erros"].append(
+            f"Formato não suportado: '{sufixo}'. Use .zip ou .db."
+        )
+        return resultado
+    
+    # Criar diretório temporário para extração
+    temp_dir = Path(tempfile.mkdtemp(prefix="ulitec_restore_"))
+    resultado["temp_dir"] = temp_dir
+    
+    try:
+        if sufixo == ".zip":
+            return _processar_upload_zip(file_bytes, nome_original, temp_dir, resultado)
+        else:
+            return _processar_upload_db(file_bytes, nome_original, temp_dir, resultado)
+    except Exception as e:
+        resultado["erros"].append(f"Erro ao processar arquivo: {str(e)}")
+        return resultado
+
+
+def _processar_upload_zip(
+    file_bytes: bytes, nome_original: str, temp_dir: Path, resultado: dict
+) -> dict:
+    """Processa arquivo ZIP enviado para restauração."""
+    try:
+        # Salvar ZIP temporário
+        zip_temp = temp_dir / nome_original
+        zip_temp.write_bytes(file_bytes)
+        
+        with zipfile.ZipFile(str(zip_temp), "r") as zf:
+            arquivos = zf.namelist()
+            
+            # Verificar se contém crm.db
+            if "crm.db" not in arquivos:
+                resultado["erros"].append(
+                    "❌ ZIP não contém 'crm.db'. Estrutura inválida."
+                )
+                return resultado
+            
+            # Extrair crm.db para validar
+            db_temp = temp_dir / "crm.db"
+            db_temp.write_bytes(zf.read("crm.db"))
+            
+            # Validar integridade do banco extraído
+            validacao = _validar_banco_sqlite(str(db_temp))
+            if not validacao["integro"]:
+                resultado["erros"].append(
+                    "❌ Banco SQLite extraído está corrompido ou com erros."
+                )
+                resultado["erros"].extend(validacao.get("erros", []))
+                return resultado
+            
+            resultado["dados_banco"] = db_temp.read_bytes()
+            
+            # Ler manifesto se existir
+            if "manifesto.json" in arquivos:
+                try:
+                    manifesto_raw = zf.read("manifesto.json").decode("utf-8")
+                    manifesto = json.loads(manifesto_raw)
+                    resultado["manifesto"] = manifesto
+                    
+                    # Montar resumo a partir do manifesto
+                    resultado["resumo"] = {
+                        "nome_arquivo": nome_original,
+                        "formato": "ZIP",
+                        "data": f"{manifesto.get('data', '?')} {manifesto.get('hora', '?')}",
+                        "versao_crm": manifesto.get("versao_crm", "?"),
+                        "quantidade_tabelas": manifesto.get("quantidade_tabelas", 0),
+                        "quantidade_registros": manifesto.get("quantidade_registros", 0),
+                        "tamanho_kb": manifesto.get("tamanho_kb", 0),
+                        "hash_sha256": manifesto.get("hash_sha256", "?"),
+                        "schema_version": manifesto.get("schema_version", "?"),
+                        "tabelas": manifesto.get("tabelas", []),
+                    }
+                    
+                    # Verificar hash se disponível
+                    hash_manifesto = manifesto.get("hash_sha256", "")
+                    if hash_manifesto and hash_manifesto != "PREPARADO_PARA_HASH":
+                        hash_extraido = hashlib.sha256(
+                            resultado["dados_banco"]
+                        ).hexdigest()
+                        if hash_extraido != hash_manifesto:
+                            resultado["erros"].append(
+                                f"❌ Hash SHA-256 não confere!\n"
+                                f"Manifesto: {hash_manifesto[:16]}...\n"
+                                f"Calculado: {hash_extraido[:16]}..."
+                            )
+                            return resultado
+                
+                except (json.JSONDecodeError, KeyError, UnicodeDecodeError) as e:
+                    resultado["erros"].append(
+                        f"⚠️ Manifesto inválido: {str(e)}"
+                    )
+                    # Continua mesmo sem manifesto válido
+            
+            # Se não tem manifesto, extrair informações do banco
+            if not resultado["resumo"]:
+                resultado["resumo"] = _extrair_resumo_banco(
+                    db_temp, nome_original, "ZIP"
+                )
+            
+            resultado["valido"] = len(resultado["erros"]) == 0
+            return resultado
+    
+    except zipfile.BadZipFile:
+        resultado["erros"].append("❌ Arquivo ZIP inválido ou corrompido.")
+        return resultado
+    except Exception as e:
+        resultado["erros"].append(f"❌ Erro ao processar ZIP: {str(e)}")
+        return resultado
+
+
+def _processar_upload_db(
+    file_bytes: bytes, nome_original: str, temp_dir: Path, resultado: dict
+) -> dict:
+    """Processa arquivo .db enviado para restauração."""
+    try:
+        # Salvar banco temporário
+        db_temp = temp_dir / nome_original
+        db_temp.write_bytes(file_bytes)
+        
+        # Validar integridade
+        validacao = _validar_banco_sqlite(str(db_temp))
+        if not validacao["integro"]:
+            resultado["erros"].append(
+                "❌ Banco SQLite inválido ou corrompido."
+            )
+            resultado["erros"].extend(validacao.get("erros", []))
+            return resultado
+        
+        resultado["dados_banco"] = file_bytes
+        
+        # Calcular hash
+        hash_calculado = hashlib.sha256(file_bytes).hexdigest()
+        
+        # Extrair resumo do banco
+        resumo = _extrair_resumo_banco(db_temp, nome_original, "SQLite Direto")
+        resumo["hash_sha256"] = hash_calculado
+        resultado["resumo"] = resumo
+        
+        resultado["valido"] = True
+        return resultado
+    
+    except Exception as e:
+        resultado["erros"].append(f"❌ Erro ao processar banco: {str(e)}")
+        return resultado
+
+
+def _extrair_resumo_banco(db_path: Path, nome_original: str, formato: str) -> dict:
+    """Extrai informações resumidas de um banco SQLite."""
+    resumo = {
+        "nome_arquivo": nome_original,
+        "formato": formato,
+        "data": datetime.fromtimestamp(db_path.stat().st_mtime).strftime(
+            "%Y-%m-%d %H:%M"
+        ),
+        "versao_crm": "?",
+        "quantidade_tabelas": 0,
+        "quantidade_registros": 0,
+        "tamanho_kb": round(db_path.stat().st_size / 1024, 2),
+        "tabelas": [],
+    }
+    
+    try:
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        
+        # Tabelas
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tabelas = [
+            r[0] for r in cursor.fetchall() if r[0] != "sqlite_sequence"
+        ]
+        resumo["tabelas"] = tabelas
+        resumo["quantidade_tabelas"] = len(tabelas)
+        
+        # Registros
+        total_reg = 0
+        for t in tabelas:
+            try:
+                cursor.execute(f'SELECT COUNT(*) FROM "{t}"')
+                total_reg += cursor.fetchone()[0]
+            except sqlite3.OperationalError:
+                pass
+        resumo["quantidade_registros"] = total_reg
+        
+        # Versão
+        cursor.execute(
+            "SELECT valor FROM configuracoes WHERE chave = 'db_version'"
+        )
+        row = cursor.fetchone()
+        resumo["versao_crm"] = row[0] if row else "?"
+        
+        # Schema version
+        cursor.execute("PRAGMA schema_version")
+        resumo["schema_version"] = cursor.fetchone()[0]
+        
+        conn.close()
+    except Exception:
+        pass
+    
+    return resumo
+
+
+def executar_restauracao_upload(
+    dados_banco: bytes,
+    nome_arquivo: str,
+    usuario: str = "Sistema",
+) -> dict:
+    """
+    Executa a restauração a partir dos bytes do banco validado.
+    
+    Fluxo:
+    1. Criar backup automático do banco atual
+    2. Substituir crm.db pelos bytes fornecidos
+    3. Verificar integridade do novo banco
+    4. Retornar relatório
+    """
+    inicio = time_module.time()
+    
+    # 1. Criar backup automático pré-restauração
+    backup_auto = criar_backup_automatico_pre_restauracao()
+    if not backup_auto["sucesso"]:
+        return {
+            "sucesso": False,
+            "erro": f"Falha ao criar backup automático: {backup_auto.get('erro', 'Erro desconhecido')}",
+            "tempo_segundos": round(time_module.time() - inicio, 2),
+        }
+    
+    try:
+        # 2. Obter informações do banco a restaurar
+        temp_dir = Path(tempfile.mkdtemp(prefix="ulitec_exec_restore_"))
+        temp_db = temp_dir / "temp_restore.db"
+        
+        try:
+            temp_db.write_bytes(dados_banco)
+            
+            # Validar antes de substituir
+            validacao = _validar_banco_sqlite(str(temp_db))
+            if not validacao["integro"]:
+                return {
+                    "sucesso": False,
+                    "erro": "Banco falhou na validação final de integridade",
+                    "detalhes_validacao": validacao,
+                    "backup_automatico": backup_auto,
+                    "tempo_segundos": round(time_module.time() - inicio, 2),
+                }
+            
+            # Coletar informações
+            conn_temp = sqlite3.connect(str(temp_db))
+            cursor_temp = conn_temp.cursor()
+            cursor_temp.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+            tabelas_restauro = [
+                r[0] for r in cursor_temp.fetchall()
+                if r[0] != "sqlite_sequence"
+            ]
+            
+            total_reg_restauro = 0
+            for t in tabelas_restauro:
+                try:
+                    cursor_temp.execute(f'SELECT COUNT(*) FROM "{t}"')
+                    total_reg_restauro += cursor_temp.fetchone()[0]
+                except sqlite3.OperationalError:
+                    pass
+            
+            cursor_temp.execute(
+                "SELECT valor FROM configuracoes WHERE chave = 'db_version'"
+            )
+            row = cursor_temp.fetchone()
+            versao_restauro = row[0] if row else "?"
+            
+            cursor_temp.execute("PRAGMA schema_version")
+            schema_restauro = cursor_temp.fetchone()[0]
+            conn_temp.close()
+            
+            # 3. Substituir o banco
+            shutil.copy2(str(temp_db), str(DB_PATH))
+        
+        finally:
+            # Limpar diretório temporário
+            shutil.rmtree(str(temp_dir), ignore_errors=True)
+        
+        # 4. Verificar integridade do novo banco
+        conn = sqlite3.connect(str(DB_PATH))
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA integrity_check")
+        integridade_final = [r[0] for r in cursor.fetchall()]
+        
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )
+        tabelas_finais = [
+            r[0] for r in cursor.fetchall()
+            if r[0] != "sqlite_sequence"
+        ]
+        
+        conn.close()
+        
+        # 5. Registrar log
+        tempo_total = round(time_module.time() - inicio, 2)
+        log_entry = {
+            "data": datetime.now().strftime("%Y-%m-%d"),
+            "hora": datetime.now().strftime("%H:%M:%S"),
+            "usuario": usuario,
+            "backup_utilizado": nome_arquivo,
+            "backup_automatico": backup_auto["nome"],
+            "resultado": (
+                "sucesso"
+                if all(x == "ok" for x in integridade_final)
+                else "falha"
+            ),
+            "tempo_segundos": tempo_total,
+            "tabelas_restauradas": len(tabelas_restauro),
+            "registros_restaurados": total_reg_restauro,
+            "versao_restaurada": versao_restauro,
+        }
+        _registrar_log_restauracao(log_entry)
+        
+        return {
+            "sucesso": True,
+            "backup_restaurado": nome_arquivo,
+            "backup_automatico_criado": backup_auto["nome"],
+            "backup_automatico_caminho": backup_auto["arquivo"],
+            "tempo_segundos": tempo_total,
+            "quantidade_tabelas": len(tabelas_restauro),
+            "quantidade_registros": total_reg_restauro,
+            "versao_restaurada": versao_restauro,
+            "schema_version_restaurado": schema_restauro,
+            "data_restauracao": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "integrity_check": (
+                "ok"
+                if all(x == "ok" for x in integridade_final)
+                else "falha"
+            ),
+            "detalhes_integridade": integridade_final,
+        }
+    
+    except Exception as e:
+        return {
+            "sucesso": False,
+            "erro": f"Erro durante restauração: {str(e)}",
+            "backup_automatico": backup_auto,
+            "tempo_segundos": round(time_module.time() - inicio, 2),
+        }
+
+
+def limpar_temporarios_restauracao(temp_dir: Path) -> None:
+    """
+    Remove diretório temporário usado na validação de restauração.
+    """
+    if temp_dir and temp_dir.exists():
+        try:
+            shutil.rmtree(str(temp_dir), ignore_errors=True)
+        except Exception:
+            pass
 
 
 def restaurar_backup(caminho_backup: str, usuario: str = "Sistema") -> dict:

@@ -531,6 +531,11 @@ with aba6:
         restaurar_backup,
         criar_backup_automatico_pre_restauracao,
         obter_informacoes_backup,
+        # NOVAS funções de Backup Portátil e Restauração por Upload
+        gerar_backup_zip_bytes,
+        processar_arquivo_enviado,
+        executar_restauracao_upload,
+        limpar_temporarios_restauracao,
     )
     from auth import verificar_login
 
@@ -611,60 +616,121 @@ with aba6:
 
         st.subheader("💾 Central de Backup")
 
-        st.markdown(
-            "Gere backups completos do sistema. "
-            "Cada backup registra automaticamente:"
-        )
+        if not is_master:
+            st.warning(
+                "⚠️ Área exclusiva para usuários **MASTER**."
+            )
+        else:
+            st.markdown(
+                "Gere um backup portátil completo do sistema. "
+                "O backup inclui:"
+            )
 
-        col_b1, col_b2 = st.columns(2)
+            col_b1, col_b2 = st.columns(2)
 
-        with col_b1:
-            st.markdown("- Data e hora")
-            st.markdown("- Versão do CRM")
-            st.markdown("- Quantidade de tabelas")
+            with col_b1:
+                st.markdown("- Banco SQLite (`crm.db`)")
+                st.markdown("- Manifesto JSON (metadados)")
+                st.markdown("- Hash SHA256 para validação")
 
-        with col_b2:
-            st.markdown("- Quantidade de registros")
-            st.markdown("- Tamanho do arquivo")
-            st.markdown("- Manifesto em JSON")
+            with col_b2:
+                st.markdown("- Versão do CRM e Schema")
+                st.markdown("- Quantidade de tabelas e registros")
+                st.markdown("- Tamanho do banco")
 
-        st.divider()
+            st.divider()
 
-        if st.button("🛠️ Gerar Backup", type="primary", width="stretch"):
-            with st.spinner("Gerando backup completo..."):
-                try:
-                    resultado = gerar_backup_completo()
+            # Botão para gerar o backup e disponibilizar download
+            if st.button(
+                "🛠️ Gerar e Baixar Backup",
+                type="primary",
+                width="stretch",
+            ):
+                with st.spinner(
+                    "Gerando backup portátil...\n\n"
+                    "▸ Copiando banco de dados\n"
+                    "▸ Calculando hash SHA256\n"
+                    "▸ Criando manifesto JSON\n"
+                    "▸ Compactando em ZIP..."
+                ):
+                    try:
+                        zip_bytes, metadados = gerar_backup_zip_bytes()
 
-                    st.success("✅ Backup gerado com sucesso!")
+                        # Armazenar no session_state para o download_button
+                        st.session_state["backup_zip_bytes"] = zip_bytes
+                        st.session_state["backup_zip_metadados"] = metadados
 
-                    col_r1, col_r2, col_r3 = st.columns(3)
-                    col_r1.metric("Arquivo", resultado["nome"])
-                    col_r2.metric("Tamanho", f"{resultado['tamanho_kb']:.2f} KB")
-                    col_r3.metric("Registros", f"{resultado['registros']:,}")
+                        st.success(
+                            f"✅ Backup gerado com sucesso!"
+                        )
 
+                        col_r1, col_r2, col_r3 = st.columns(3)
+                        col_r1.metric(
+                            "Arquivo", metadados["nome_arquivo"]
+                        )
+                        col_r2.metric(
+                            "Tamanho", f"{metadados['tamanho_kb']:.2f} KB"
+                        )
+                        col_r3.metric(
+                            "Registros", f"{metadados['registros']:,}"
+                        )
+
+                        col_r4, col_r5 = st.columns(2)
+                        col_r4.metric(
+                            "Tabelas", metadados["tabelas"]
+                        )
+                        col_r5.metric(
+                            "Hash SHA256",
+                            metadados["hash_sha256"][:16] + "...",
+                        )
+
+                    except Exception as e:
+                        st.error(f"❌ Erro ao gerar backup: {str(e)}")
+
+            # Download button (aparece após gerar)
+            if "backup_zip_bytes" in st.session_state:
+                st.divider()
+                metadados = st.session_state.get("backup_zip_metadados", {})
+                nome_arquivo = metadados.get("nome_arquivo", "backup_ULITEC.zip")
+
+                st.download_button(
+                    label=f"📥 Baixar {nome_arquivo}",
+                    data=st.session_state["backup_zip_bytes"],
+                    file_name=nome_arquivo,
+                    mime="application/zip",
+                    type="primary",
+                    width="stretch",
+                )
+
+                if metadados.get("copia_local"):
                     st.info(
-                        f"📄 Manifesto salvo em: `{resultado['manifesto']}`"
+                        f"💾 Cópia local salva em: "
+                        f"`{metadados['copia_local']}`"
                     )
 
-                except Exception as e:
-                    st.error(f"❌ Erro ao gerar backup: {str(e)}")
+                # Manifesto expandido
+                with st.expander("📄 Ver Manifesto do Backup"):
+                    st.json(metadados["manifesto"])
 
-        st.divider()
+            st.divider()
 
-        # Listar backups existentes
-        st.markdown("### 📋 Backups Existentes")
+            # Listar backups existentes (legado)
+            st.markdown("### 📋 Backups no Servidor (Legado)")
 
-        backups = listar_backups_disponiveis()
-        backups_db = [b for b in backups if b.get("tipo") == "local" or b["nome"].endswith(".db")]
+            backups = listar_backups_disponiveis()
+            backups_db = [
+                b for b in backups
+                if b.get("tipo") == "local" or b["nome"].endswith(".db")
+            ]
 
-        if not backups_db:
-            st.info("Nenhum backup encontrado.")
-        else:
-            for b in backups_db:
-                col_bn1, col_bn2, col_bn3 = st.columns([3, 1, 1])
-                col_bn1.markdown(f"`{b['nome']}`")
-                col_bn2.markdown(f"{b['tamanho_kb']:.1f} KB")
-                col_bn3.markdown(f"{b['modificado']}")
+            if not backups_db:
+                st.info("Nenhum backup local encontrado.")
+            else:
+                for b in backups_db:
+                    col_bn1, col_bn2, col_bn3 = st.columns([3, 1, 1])
+                    col_bn1.markdown(f"`{b['nome']}`")
+                    col_bn2.markdown(f"{b['tamanho_kb']:.1f} KB")
+                    col_bn3.markdown(f"{b['modificado']}")
 
     # ============================================================
     # BLOCO 3 - EXPORTAÇÃO
@@ -720,177 +786,181 @@ with aba6:
 
         st.subheader("🔄 Restauração do Sistema")
 
-        st.warning(
-            "⚠️ **ATENÇÃO:** A restauração substituirá COMPLETAMENTE o banco de dados "
-            "atual (`crm.db`) pelo backup selecionado.\n\n"
-            "Antes de restaurar, o sistema cria automaticamente um backup de segurança "
-            "do banco atual.\n\n"
-            "**É obrigatório:** Backup automático ✅ → Log ✅ → Senha MASTER ✅ → "
-            "Confirmação textual ✅"
-        )
-
-        st.divider()
-
-        # ── Estado da sessão para o fluxo de restauração ──
-        if "restore_backup_selecionado" not in st.session_state:
-            st.session_state["restore_backup_selecionado"] = None
-        if "restore_validacao" not in st.session_state:
-            st.session_state["restore_validacao"] = None
-        if "restore_backup_auto" not in st.session_state:
-            st.session_state["restore_backup_auto"] = None
-        if "restore_etapa" not in st.session_state:
-            st.session_state["restore_etapa"] = "selecao"
-
-        # ── Listar backups disponíveis ──
-        backups_disponiveis = listar_backups()
-
-        if not backups_disponiveis:
-            st.info("📭 Nenhum backup disponível para restauração.")
-            st.markdown(
-                "Crie um backup na aba **💾 Backup** ou exporte "
-                "na aba **📦 Exportação** primeiro."
+        if not is_master:
+            st.warning(
+                "⚠️ Área exclusiva para usuários **MASTER**."
             )
         else:
-            # ── SELECAO ──
-            st.markdown("### 📂 Passo 1: Selecionar Backup")
-
-            opcoes_rest = {}
-            for b in backups_disponiveis:
-                label = f"{b['nome']} — {b['tamanho_kb']:.1f} KB — {b['modificado']} ({b['tipo']})"
-                opcoes_rest[label] = b["caminho"]
-
-                # Armazenar metadados em session_state
-                if f"restore_info_{b['caminho']}" not in st.session_state:
-                    info = obter_informacoes_backup(b["caminho"])
-                    st.session_state[f"restore_info_{b['caminho']}"] = info
-
-            selecao_label = st.selectbox(
-                "Selecione um arquivo de backup",
-                list(opcoes_rest.keys()),
-                key="restore_select",
+            st.warning(
+                "⚠️ **ATENÇÃO:** A restauração substituirá COMPLETAMENTE o banco de dados "
+                "atual (`crm.db`) pelo backup enviado.\n\n"
+                "Antes de restaurar, o sistema cria automaticamente um backup de segurança "
+                "do banco atual.\n\n"
+                "**É obrigatório:** Upload ✅ → Validação ✅ → Senha MASTER ✅ → "
+                "Confirmação textual ✅"
             )
 
-            if selecao_label:
-                caminho_sel = opcoes_rest[selecao_label]
-                st.session_state["restore_backup_selecionado"] = caminho_sel
+            st.divider()
 
-                # ── VALIDAÇÃO ──
+            # ── Estado da sessão para o fluxo de restauração por upload ──
+            if "upload_restore_validacao" not in st.session_state:
+                st.session_state["upload_restore_validacao"] = None
+            if "upload_restore_dados_banco" not in st.session_state:
+                st.session_state["upload_restore_dados_banco"] = None
+            if "upload_restore_temp_dir" not in st.session_state:
+                st.session_state["upload_restore_temp_dir"] = None
+
+            # ── PASSO 1: Upload do arquivo ──
+            st.markdown("### 📂 Passo 1: Upload do Backup")
+
+            arquivo_enviado = st.file_uploader(
+                "Selecione o arquivo de backup (.zip ou .db)",
+                type=["zip", "db"],
+                key="restore_upload",
+                help="Faça upload do arquivo de backup gerado anteriormente.",
+            )
+
+            if arquivo_enviado:
+                nome_arquivo = arquivo_enviado.name
+                tamanho_kb = round(len(arquivo_enviado.getvalue()) / 1024, 2)
+
+                st.info(
+                    f"📄 **Arquivo recebido:** `{nome_arquivo}` "
+                    f"({tamanho_kb:.2f} KB)"
+                )
+
+                # ── PASSO 2: Validar arquivo ──
                 st.divider()
                 st.markdown("### 🔍 Passo 2: Validação do Backup")
 
-                if st.button("🔍 Validar Backup", type="primary", width="stretch"):
-                    with st.spinner("Validando backup..."):
-                        validacao = validar_backup(caminho_sel)
-                        st.session_state["restore_validacao"] = validacao
-                        st.session_state["restore_etapa"] = "validacao"
+                if st.button("🔍 Validar Backup Enviado", type="primary", width="stretch"):
+                    with st.spinner(
+                        "Validando arquivo de backup...\n\n"
+                        "▸ Verificando extensão\n"
+                        "▸ Validando integridade SQLite\n"
+                        "▸ Verificando manifesto (se ZIP)\n"
+                        "▸ Calculando hash SHA256..."
+                    ):
+                        try:
+                            resultado = processar_arquivo_enviado(
+                                arquivo_enviado.getvalue(),
+                                nome_arquivo,
+                            )
 
-                # Exibir validação se existir
-                validacao = st.session_state.get("restore_validacao")
+                            st.session_state["upload_restore_validacao"] = resultado
+                            if resultado.get("valido"):
+                                st.session_state["upload_restore_dados_banco"] = resultado["dados_banco"]
+                                st.session_state["upload_restore_temp_dir"] = resultado.get("temp_dir")
 
-                if validacao and st.session_state["restore_backup_selecionado"] == caminho_sel:
-                    # Cards de verificação
-                    st.markdown("#### 📋 Resultado da Validação")
+                            # Limpar arquivo do uploader
+                            if "restore_upload" in st.session_state:
+                                del st.session_state["restore_upload"]
 
-                    for v in validacao.get("verificacoes", []):
-                        status_icon = v.get("status", "❓")
-                        item = v.get("item", "")
-                        detalhe = v.get("detalhe", "")
-                        col_vicon, col_vitem, col_vdet = st.columns([1, 3, 6])
-                        col_vicon.markdown(f"**{status_icon}**")
-                        col_vitem.markdown(f"**{item}**")
-                        col_vdet.markdown(detalhe)
+                            st.rerun()
 
-                    if validacao.get("valido") and validacao.get("pode_restaurar"):
-                        st.success("✅ **Backup válido!** Pode prosseguir com a restauração.")
-                    else:
-                        st.error("❌ **Backup inválido!** Restauração bloqueada.")
-                        for erro in validacao.get("erros", []):
-                            st.markdown(f"- {erro}")
+                        except Exception as e:
+                            st.error(f"❌ Erro ao validar: {str(e)}")
 
-                    # Informações detalhadas em cards
-                    st.divider()
-                    st.markdown("#### 📊 Informações do Backup")
+                # Exibir resultado da validação
+                validacao = st.session_state.get("upload_restore_validacao")
 
-                    info_backup = st.session_state.get(f"restore_info_{caminho_sel}", {})
+                if validacao:
+                    if validacao.get("valido"):
+                        st.success("✅ **Backup válido!** Pronto para restauração.")
 
-                    if info_backup and "erro" not in info_backup:
-                        col_i1, col_i2, col_i3 = st.columns(3)
-                        with col_i1:
-                            st.metric("Arquivo", info_backup.get("nome", "?"))
-                            st.metric("Tamanho", f"{info_backup.get('tamanho_kb', 0):.2f} KB")
-                        with col_i2:
-                            st.metric("Tabelas", info_backup.get("quantidade_tabelas", "?"))
-                            st.metric("Registros", f"{info_backup.get('quantidade_registros', 0):,}")
-                        with col_i3:
-                            st.metric("Versão CRM", info_backup.get("versao_crm", "?"))
-                            st.metric("Data", info_backup.get("data_backup", info_backup.get("modificado", "?")))
+                        # Resumo do backup
+                        resumo = validacao.get("resumo", {})
+                        if resumo:
+                            st.markdown("#### 📊 Resumo do Backup")
 
-                        # Manifesto expandido
-                        manifesto = ler_manifesto_backup(caminho_sel)
-                        if manifesto.get("encontrado") and manifesto.get("manifesto"):
+                            col_r1, col_r2, col_r3 = st.columns(3)
+                            with col_r1:
+                                st.metric("Arquivo", resumo.get("nome_arquivo", "?"))
+                                st.metric("Formato", resumo.get("formato", "?"))
+                            with col_r2:
+                                st.metric(
+                                    "Data",
+                                    resumo.get("data", "?"),
+                                )
+                                st.metric(
+                                    "Versão CRM",
+                                    resumo.get("versao_crm", "?"),
+                                )
+                            with col_r3:
+                                st.metric(
+                                    "Tabelas",
+                                    resumo.get("quantidade_tabelas", 0),
+                                )
+                                st.metric(
+                                    "Registros",
+                                    f"{resumo.get('quantidade_registros', 0):,}",
+                                )
+
+                            col_r4, col_r5 = st.columns(2)
+                            with col_r4:
+                                st.metric(
+                                    "Tamanho",
+                                    f"{resumo.get('tamanho_kb', 0):.2f} KB",
+                                )
+                            with col_r5:
+                                hash_val = resumo.get("hash_sha256", "?")
+                                st.metric(
+                                    "Hash SHA256",
+                                    hash_val[:16] + "..." if len(hash_val) > 16 else hash_val,
+                                )
+
+                            # Schema version
+                            if resumo.get("schema_version"):
+                                st.caption(
+                                    f"Schema Version: {resumo['schema_version']}"
+                                )
+
+                        # Manifesto (se disponível)
+                        manifesto = validacao.get("manifesto")
+                        if manifesto:
                             with st.expander("📄 Ver Manifesto Completo"):
-                                st.json(manifesto["manifesto"])
-                                st.caption(f"Fonte: {manifesto['fonte']}")
+                                st.json(manifesto)
 
                         # Lista de tabelas
-                        tabelas = info_backup.get("tabelas", [])
+                        tabelas = resumo.get("tabelas", [])
                         if tabelas:
                             with st.expander(f"📋 Tabelas ({len(tabelas)})"):
                                 for t in tabelas:
                                     st.markdown(f"- `{t}`")
 
-                    # ── ETAPAS DE SEGURANÇA (se backup válido) ──
-                    if validacao.get("valido") and validacao.get("pode_restaurar"):
+                        # ── PASSO 3: Autenticação MASTER ──
                         st.divider()
-                        st.markdown("### 🔒 Passo 3: Backup Automático de Segurança")
-
-                        if st.button("📦 Criar Backup Automático Pré-Restauração",
-                                     width="stretch"):
-                            with st.spinner("Criando backup de segurança do banco atual..."):
-                                backup_auto = criar_backup_automatico_pre_restauracao()
-                                if backup_auto["sucesso"]:
-                                    st.session_state["restore_backup_auto"] = backup_auto
-                                    st.success(
-                                        f"✅ Backup automático criado: **{backup_auto['nome']}**"
-                                    )
-                                    st.info(
-                                        f"📁 Salvo em: `{backup_auto['arquivo']}`\n\n"
-                                        f"📦 Tamanho: {backup_auto['tamanho_kb']:.2f} KB"
-                                    )
-                                else:
-                                    st.error(
-                                        f"❌ Falha ao criar backup automático: "
-                                        f"{backup_auto.get('erro', 'Erro desconhecido')}"
-                                    )
-
-                        # ── AUTENTICAÇÃO MASTER ──
-                        st.divider()
-                        st.markdown("### 🔐 Passo 4: Autenticação MASTER")
+                        st.markdown("### 🔐 Passo 3: Autenticação MASTER")
 
                         login_master = st.session_state.get("login", "")
                         senha_master_restore = st.text_input(
                             "Senha do usuário MASTER",
                             type="password",
-                            key="restore_senha_master",
+                            key="restore_upload_senha_master",
                         )
 
                         autenticado_restore = False
                         if senha_master_restore:
-                            resultado_login = verificar_login(login_master, senha_master_restore)
-                            if resultado_login and resultado_login.get("perfil") == "MASTER":
+                            resultado_login = verificar_login(
+                                login_master, senha_master_restore
+                            )
+                            if (
+                                resultado_login
+                                and resultado_login.get("perfil") == "MASTER"
+                            ):
                                 autenticado_restore = True
                                 st.success("✅ Autenticado como MASTER")
                             else:
                                 st.error("❌ Senha MASTER inválida.")
 
-                        # ── CONFIRMAÇÃO TEXTUAL ──
+                        # ── PASSO 4: Confirmação textual ──
                         st.divider()
-                        st.markdown("### ✍️ Passo 5: Confirmação Textual")
+                        st.markdown("### ✍️ Passo 4: Confirmação Textual")
 
                         confirmacao_texto_restore = st.text_input(
                             "Digite exatamente: **RESTAURAR SISTEMA**",
                             type="default",
-                            key="restore_confirmacao_texto",
+                            key="restore_upload_confirmacao_texto",
                         )
 
                         confirmacao_restore_ok = (
@@ -902,29 +972,21 @@ with aba6:
                         elif confirmacao_restore_ok:
                             st.success("✅ Confirmação textual aceita.")
 
-                        # ── VERIFICAR SE PODE RESTAURAR ──
-                        backup_auto_feito = st.session_state.get("restore_backup_auto") is not None
-
+                        # ── PASSO 5: Executar restauração ──
                         pode_restaurar = (
-                            validacao.get("valido", False)
-                            and validacao.get("pode_restaurar", False)
-                            and backup_auto_feito
-                            and autenticado_restore
-                            and confirmacao_restore_ok
+                            autenticado_restore and confirmacao_restore_ok
                         )
 
-                        # ── BOTÃO DE RESTAURAÇÃO ──
                         st.divider()
-                        st.markdown("### ⚡ Passo 6: Executar Restauração")
+                        st.markdown("### ⚡ Passo 5: Executar Restauração")
 
                         if pode_restaurar:
                             st.error(
                                 "🚨 **ÚLTIMA OPORTUNIDADE DE CANCELAR**\n\n"
-                                "Esta ação substituirá COMPLETAMENTE o banco de dados atual "
-                                "pelo backup selecionado.\n\n"
-                                f"**Backup a restaurar:** {Path(caminho_sel).name}\n"
-                                f"**Backup automático criado:** "
-                                f"{st.session_state['restore_backup_auto']['nome']}\n\n"
+                                "Esta ação substituirá COMPLETAMENTE o banco de dados "
+                                "atual pelo backup enviado.\n\n"
+                                f"**Backup a restaurar:** `{nome_arquivo}`\n"
+                                "**Backup automático:** será criado automaticamente\n\n"
                                 "**Esta operação é IRREVERSÍVEL.**"
                             )
 
@@ -938,21 +1000,28 @@ with aba6:
                                 ):
                                     with st.spinner(
                                         "🔄 Restaurando sistema...\n\n"
-                                        "1/4 Backup automático ✓\n"
-                                        "2/4 Substituindo banco...\n"
-                                        "3/4 Verificando integridade...\n"
-                                        "4/4 Gerando relatório..."
+                                        "▸ Criando backup automático\n"
+                                        "▸ Validando integridade do banco\n"
+                                        "▸ Substituindo crm.db\n"
+                                        "▸ Verificando integridade final\n"
+                                        "▸ Gerando relatório..."
                                     ):
                                         try:
                                             usuario_atual = st.session_state.get(
                                                 "usuario_nome", "Sistema"
                                             )
-                                            resultado = restaurar_backup(
-                                                caminho_sel,
+                                            resultado = executar_restauracao_upload(
+                                                st.session_state["upload_restore_dados_banco"],
+                                                nome_arquivo,
                                                 usuario=usuario_atual,
                                             )
 
                                             if resultado["sucesso"]:
+                                                # Limpar temporários
+                                                temp_dir = st.session_state.get("upload_restore_temp_dir")
+                                                if temp_dir:
+                                                    limpar_temporarios_restauracao(temp_dir)
+
                                                 st.balloons()
                                                 st.success(
                                                     "✅ **RESTAURAÇÃO CONCLUÍDA COM SUCESSO!**"
@@ -993,9 +1062,20 @@ with aba6:
                                                 st.info(
                                                     f"📅 **Data da restauração:** "
                                                     f"{resultado['data_restauracao']}\n\n"
+                                                    f"🗄️ **Schema Version:** "
+                                                    f"{resultado.get('schema_version_restaurado', '?')}\n\n"
                                                     f"✅ **Integrity Check:** "
                                                     f"{resultado['integrity_check']}"
                                                 )
+
+                                                # Limpar session state
+                                                for key in [
+                                                    "upload_restore_validacao",
+                                                    "upload_restore_dados_banco",
+                                                    "upload_restore_temp_dir",
+                                                ]:
+                                                    if key in st.session_state:
+                                                        del st.session_state[key]
 
                                                 # Botão reiniciar
                                                 st.divider()
@@ -1036,28 +1116,180 @@ with aba6:
                                     "❌ Cancelar",
                                     width="stretch",
                                 ):
-                                    # Limpar estado
-                                    for key in list(st.session_state.keys()):
-                                        if key.startswith("restore_"):
+                                    # Limpar temporários e estado
+                                    temp_dir = st.session_state.get("upload_restore_temp_dir")
+                                    if temp_dir:
+                                        limpar_temporarios_restauracao(temp_dir)
+
+                                    for key in [
+                                        "upload_restore_validacao",
+                                        "upload_restore_dados_banco",
+                                        "upload_restore_temp_dir",
+                                    ]:
+                                        if key in st.session_state:
                                             del st.session_state[key]
                                     st.rerun()
 
                         else:
                             # Mostrar o que falta
                             pendentes = []
-                            if not validacao.get("valido", False) or not validacao.get("pode_restaurar", False):
-                                pendentes.append("❌ Backup inválido")
-                            if not backup_auto_feito:
-                                pendentes.append("⏳ Backup automático não criado")
                             if not autenticado_restore:
                                 pendentes.append("⏳ Autenticação MASTER pendente")
                             if not confirmacao_restore_ok:
                                 pendentes.append("⏳ Confirmação textual pendente")
 
-                            st.warning(
-                                "⚠️ Complete todos os passos de segurança:\n\n"
-                                + "\n".join(f"- {p}" for p in pendentes)
+                            if pendentes:
+                                st.warning(
+                                    "⚠️ Complete todos os passos de segurança:\n\n"
+                                    + "\n".join(f"- {p}" for p in pendentes)
+                                )
+                            else:
+                                st.info(
+                                    "🔒 Complete a autenticação e confirmação "
+                                    "acima para liberar a restauração."
+                                )
+
+                    else:
+                        # Backup inválido
+                        st.error("❌ **Arquivo inválido!** Restauração bloqueada.")
+                        for erro in validacao.get("erros", []):
+                            st.markdown(f"- {erro}")
+
+                        # Limpar
+                        if st.button("🔄 Limpar e tentar outro arquivo", width="stretch"):
+                            temp_dir = st.session_state.get("upload_restore_temp_dir")
+                            if temp_dir:
+                                limpar_temporarios_restauracao(temp_dir)
+
+                            for key in [
+                                "upload_restore_validacao",
+                                "upload_restore_dados_banco",
+                                "upload_restore_temp_dir",
+                            ]:
+                                if key in st.session_state:
+                                    del st.session_state[key]
+                            st.rerun()
+
+            st.divider()
+
+            # ── Seção Legado: restauração de backups no servidor ──
+            st.markdown("### 📂 Restauração de Backups no Servidor (Legado)")
+
+            backups_disponiveis = listar_backups()
+
+            if not backups_disponiveis:
+                st.info("📭 Nenhum backup antigo disponível no servidor.")
+            else:
+                with st.expander("📋 Ver backups no servidor"):
+                    st.markdown(
+                        "Backups armazenados localmente no servidor "
+                        "(método antigo)."
+                    )
+
+                    opcoes_rest = {}
+                    for b in backups_disponiveis:
+                        label = (
+                            f"{b['nome']} — {b['tamanho_kb']:.1f} KB — "
+                            f"{b['modificado']} ({b['tipo']})"
+                        )
+                        opcoes_rest[label] = b["caminho"]
+
+                        if f"restore_info_{b['caminho']}" not in st.session_state:
+                            info = obter_informacoes_backup(b["caminho"])
+                            st.session_state[f"restore_info_{b['caminho']}"] = info
+
+                    selecao_label = st.selectbox(
+                        "Selecione um backup do servidor",
+                        list(opcoes_rest.keys()),
+                        key="restore_legacy_select",
+                    )
+
+                    if selecao_label:
+                        caminho_sel = opcoes_rest[selecao_label]
+                        info_backup = st.session_state.get(
+                            f"restore_info_{caminho_sel}", {}
+                        )
+
+                        if info_backup and "erro" not in info_backup:
+                            col_i1, col_i2, col_i3 = st.columns(3)
+                            with col_i1:
+                                st.metric("Arquivo", info_backup.get("nome", "?"))
+                                st.metric(
+                                    "Tamanho",
+                                    f"{info_backup.get('tamanho_kb', 0):.2f} KB",
+                                )
+                            with col_i2:
+                                st.metric(
+                                    "Tabelas",
+                                    info_backup.get("quantidade_tabelas", "?"),
+                                )
+                                st.metric(
+                                    "Registros",
+                                    f"{info_backup.get('quantidade_registros', 0):,}",
+                                )
+                            with col_i3:
+                                st.metric(
+                                    "Versão CRM",
+                                    info_backup.get("versao_crm", "?"),
+                                )
+                                st.metric(
+                                    "Data",
+                                    info_backup.get(
+                                        "data_backup",
+                                        info_backup.get("modificado", "?"),
+                                    ),
+                                )
+
+                            # Botão para restaurar (fluxo legado simplificado)
+                            senha_legacy = st.text_input(
+                                "Senha MASTER (legado)",
+                                type="password",
+                                key="restore_legacy_senha",
                             )
+                            confirmacao_legacy = st.text_input(
+                                "Digite RESTAURAR SISTEMA",
+                                key="restore_legacy_confirmacao",
+                            )
+
+                            if (
+                                senha_legacy
+                                and confirmacao_legacy == "RESTAURAR SISTEMA"
+                            ):
+                                resultado_login = verificar_login(
+                                    st.session_state.get("login", ""),
+                                    senha_legacy,
+                                )
+                                if (
+                                    resultado_login
+                                    and resultado_login.get("perfil") == "MASTER"
+                                ):
+                                    if st.button(
+                                        "⚠️ Restaurar (Legado)",
+                                        type="primary",
+                                        width="stretch",
+                                    ):
+                                        with st.spinner("Restaurando..."):
+                                            try:
+                                                resultado = restaurar_backup(
+                                                    caminho_sel,
+                                                    usuario=st.session_state.get(
+                                                        "usuario_nome", "Sistema"
+                                                    ),
+                                                )
+                                                if resultado["sucesso"]:
+                                                    st.success(
+                                                        "✅ Restauração legada concluída!"
+                                                    )
+                                                    st.metric(
+                                                        "Registros",
+                                                        f"{resultado['quantidade_registros']:,}",
+                                                    )
+                                                else:
+                                                    st.error(
+                                                        f"❌ Falha: {resultado.get('erro')}"
+                                                    )
+                                            except Exception as e:
+                                                st.error(f"❌ Erro: {str(e)}")
 
     # ============================================================
     # BLOCO 5 - MANUTENÇÃO

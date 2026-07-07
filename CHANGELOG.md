@@ -7,6 +7,25 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.0.4] — 2026-07-07
+
+### Added
+- **Backup Portátil Exportável**: Geração de backup completo em ZIP com manifesto JSON, hash SHA256 e download direto pelo navegador
+- **Restauração por Upload**: Upload de arquivo ZIP de backup com validação automática (manifesto, hash, schema, tabelas)
+- Novas funções em `services/admin_sistema.py`: `gerar_backup_zip_bytes`, `processar_arquivo_enviado`, `executar_restauracao_upload`, `limpar_temporarios_restauracao`
+- Bloqueio de acesso às abas Backup e Restauração para usuários não-MASTER
+
+### Changed
+- Aba "💾 Backup" reformulada: botão "Gerar e Baixar Backup" com métricas (tamanho, registros, tabelas, hash) e download button
+- Aba "🔄 Restauração" migrada para fluxo de upload com validação completa (manifesto JSON, hash SHA256, integridade SQLite)
+- Seção legado de restauração movida para expander colapsável "Restauração de Backups no Servidor (Legado)"
+- Abas Backup e Restauração restritas a perfil MASTER
+
+### Fixed
+- Correções de importação: funções novas adicionadas ao `from services.admin_sistema import` no `pages/90_Administracao.py`
+
+---
+
 ## [1.0.3] — 2026-07-02
 
 ### Added

@@ -29,9 +29,9 @@ from pathlib import Path
 # METADADOS OFICIAIS DA VERSÃO
 # ═══════════════════════════════════════════════════════════
 
-VERSION = "1.0.3"
-BUILD = "2025.0702.0"          # Formato: YYYY.MMDD.PATCH
-RELEASE_DATE = "2026-07-02"
+VERSION = "1.0.4"
+BUILD = "2026.0707.0"          # Formato: YYYY.MMDD.PATCH
+RELEASE_DATE = "2026-07-07"
 AMBIENTE = os.getenv("ULITEC_AMBIENTE", "DEV").upper()
 
 SYSTEM_NAME = "ULITEC CRM"
