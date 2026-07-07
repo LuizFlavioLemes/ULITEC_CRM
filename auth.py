@@ -218,6 +218,7 @@ def fazer_login(user: dict):
     st.session_state["usuario_logado"] = True
     st.session_state["usuario_id"] = user["id"]
     st.session_state["usuario_nome"] = user["nome"]
+    st.session_state["login"] = user["login"]  # ← necessário para validação MASTER
     st.session_state["perfil"] = user["perfil"]
     st.session_state["unidade_usuario"] = user["unidade_nome"] or "ULITEC SP"
     if user["unidade_nome"]:
