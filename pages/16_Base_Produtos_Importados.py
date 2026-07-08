@@ -1925,11 +1925,11 @@ with abas[4]:
             column_config={
                 "id": "ID",
                 "descricao": "Tipo Produto",
-                "ii": st.column_config.NumberColumn("II (%)", min_value=0.0, max_value=100.0, step=0.1, format="%.2f"),
-                "ipi": st.column_config.NumberColumn("IPI (%)", min_value=0.0, max_value=100.0, step=0.1, format="%.2f"),
-                "pis": st.column_config.NumberColumn("PIS (%)", min_value=0.0, max_value=100.0, step=0.1, format="%.2f"),
-                "cofins": st.column_config.NumberColumn("COFINS (%)", min_value=0.0, max_value=100.0, step=0.1, format="%.2f"),
-                "icms": st.column_config.NumberColumn("ICMS (%)", min_value=0.0, max_value=100.0, step=0.1, format="%.2f"),
+            "ii": st.column_config.NumberColumn("II (%)", min_value=0.0, max_value=100.0, step=0.01, format="%.2f"),
+                "ipi": st.column_config.NumberColumn("IPI (%)", min_value=0.0, max_value=100.0, step=0.01, format="%.2f"),
+                "pis": st.column_config.NumberColumn("PIS (%)", min_value=0.0, max_value=100.0, step=0.01, format="%.2f"),
+                "cofins": st.column_config.NumberColumn("COFINS (%)", min_value=0.0, max_value=100.0, step=0.01, format="%.2f"),
+                "icms": st.column_config.NumberColumn("ICMS (%)", min_value=0.0, max_value=100.0, step=0.01, format="%.2f"),
             },
             hide_index=True,
             width="stretch",
@@ -1967,6 +1967,67 @@ with abas[4]:
         )
     else:
         st.info("Nenhum NCM cadastrado.")
+
+    # ── CADASTRO DE NOVO NCM ──
+    st.markdown("---")
+    st.subheader("➕ Cadastrar Novo NCM")
+
+    with st.form("cadastro_ncm"):
+        col_ncm1, col_ncm2 = st.columns(2)
+
+        with col_ncm1:
+            novo_ncm = st.text_input(
+                "NCM *",
+                placeholder="Ex: 84145910",
+                key="input_novo_ncm",
+            )
+
+        with col_ncm2:
+            conn_tipos = get_conn()
+            tipos_ncm = conn_tipos.execute(
+                "SELECT id, descricao FROM tipo_produto_importado WHERE ativo = 1 ORDER BY descricao"
+            ).fetchall()
+            conn_tipos.close()
+            tipo_ncm_opcoes = {t[1]: t[0] for t in tipos_ncm}
+            tipo_selecionado = st.selectbox(
+                "Tipo Produto *",
+                options=list(tipo_ncm_opcoes.keys()),
+                key="select_tipo_ncm",
+            )
+
+        descricao_ncm = st.text_input(
+            "Descrição",
+            placeholder="Descrição do NCM",
+            key="input_desc_ncm",
+        )
+
+        submitted_ncm = st.form_submit_button(
+            "📋 Cadastrar NCM",
+            type="primary",
+            width="stretch",
+        )
+
+        if submitted_ncm:
+            if not novo_ncm.strip():
+                st.error("O campo NCM é obrigatório.")
+            elif not tipo_selecionado:
+                st.error("Selecione um Tipo Produto.")
+            else:
+                tipo_id = tipo_ncm_opcoes[tipo_selecionado]
+                sucesso, msg = cadastrar_ncm(
+                    novo_ncm.strip(),
+                    descricao_ncm.strip(),
+                    tipo_id,
+                )
+                if sucesso:
+                    st.success(f"✅ NCM {novo_ncm.strip()} cadastrado com sucesso!")
+                    st.rerun()
+                else:
+                    # Tratar erro de duplicidade com mensagem amigável
+                    if "UNIQUE constraint" in str(msg):
+                        st.error(f"❌ NCM {novo_ncm.strip()} já está cadastrado no sistema.")
+                    else:
+                        st.error(f"Erro ao cadastrar NCM: {msg}")
 
     # ============================================================
     # NOVA SEÇÃO: CADASTRO DE FORNECEDORES

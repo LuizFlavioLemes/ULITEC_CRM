@@ -482,11 +482,18 @@ with tab2:
         followup_atual = row_atual[0] if row_atual else None
 
         # ── Calcula followup automaticamente ──
+        # v1.5.2: Quando volta para PROPOSTA ENVIADA, reseta o ciclo de follow-up
+        resetar_ciclo = False
         if status in ("APROVADA", "FATURADA", "EXPEDIDA", "PERDIDA", "CANCELADA"):
             followup_calc = None
         elif status == "PROPOSTA ENVIADA":
             dias = int(get_config("followup_1", "2"))
             followup_calc = date.today() + timedelta(days=dias)
+            # Reseta o ciclo se a OS estava em status terminal ou follow-up
+            if registro["status"] in (
+                "APROVADA", "FATURADA", "EXPEDIDA", "PERDIDA", "CANCELADA"
+            ):
+                resetar_ciclo = True
         else:
             followup_calc = followup_atual
 
@@ -523,6 +530,11 @@ with tab2:
             else:
                 sets.append(f"{col} = ?")
                 vals.append(val)
+
+        # v1.5.2: Reseta ciclo de follow-up quando OS volta para PROPOSTA ENVIADA
+        if resetar_ciclo:
+            sets.append("followup_count = 0")
+
         vals.append(int(os_id))
 
         conn.execute(
@@ -655,12 +667,12 @@ with tab3:
     st.dataframe(grupo_tecnico, width="stretch", hide_index=True)
 
 # =====================================================
-# ABA 4 — FOLLOW-UP DE PROPOSTAS
+# ABA 4 — FOLLOW-UP DE PROPOSTAS (PAINEL OPERACIONAL)
 # =====================================================
 
 with tab4:
 
-    st.subheader("📞 Follow-up de Propostas")
+    st.subheader("📞 Painel Operacional — Follow-up de Propostas")
 
     # Filtrar OS com proposta enviada e aguardando retorno
     df_propostas = df[
@@ -670,9 +682,239 @@ with tab4:
     if df_propostas.empty:
         st.success("Nenhuma proposta pendente de follow-up no momento.")
     else:
-        hoje_str = date.today().strftime("%Y-%m-%d")
+        hoje = pd.Timestamp.today().normalize()
+        amanha = hoje + pd.Timedelta(days=1)
+        limite_3dias = hoje + pd.Timedelta(days=3)
 
-        # ── 1. Registrar Follow-up (primeiro) ──
+        # ── Função auxiliar: extrair último histórico do campo observacoes ──
+        def extrair_ultimo_historico(obs):
+            """Extrai a primeira linha do campo observacoes (entrada mais recente)."""
+            if pd.isna(obs) or not obs:
+                return "—"
+            primeira_linha = str(obs).split("\n")[0].strip()
+            # Limitar tamanho para exibição
+            if len(primeira_linha) > 120:
+                return primeira_linha[:117] + "..."
+            return primeira_linha
+
+        # ── Classificar cada proposta ──
+        df_propostas["dias_restantes"] = (
+            df_propostas["proximo_followup"] - hoje
+        ).dt.days
+
+        df_propostas["categoria"] = "DEMAIS"
+        df_propostas.loc[
+            df_propostas["proximo_followup"] < hoje, "categoria"
+        ] = "ATRASADO"
+        df_propostas.loc[
+            df_propostas["proximo_followup"] == hoje, "categoria"
+        ] = "HOJE"
+        df_propostas.loc[
+            df_propostas["proximo_followup"] == amanha, "categoria"
+        ] = "AMANHA"
+        df_propostas.loc[
+            (df_propostas["proximo_followup"] > hoje)
+            & (df_propostas["proximo_followup"] <= limite_3dias)
+            & (df_propostas["categoria"] == "DEMAIS"),
+            "categoria"
+        ] = "PROXIMOS_3"
+
+        df_propostas["ultimo_historico"] = df_propostas["observacoes"].apply(
+            extrair_ultimo_historico
+        )
+
+        # ── Contadores ──
+        qtd_atrasados = len(df_propostas[df_propostas["categoria"] == "ATRASADO"])
+        qtd_hoje = len(df_propostas[df_propostas["categoria"] == "HOJE"])
+        qtd_amanha = len(df_propostas[df_propostas["categoria"] == "AMANHA"])
+        qtd_prox3 = len(df_propostas[df_propostas["categoria"] == "PROXIMOS_3"])
+        qtd_demais = len(df_propostas[
+            ~df_propostas["categoria"].isin(
+                ["ATRASADO", "HOJE", "AMANHA", "PROXIMOS_3"]
+            )
+        ])
+
+        # ═══════════════════════════════════════════════════
+        # AUTO-SELEÇÃO DA FILA MAIS URGENTE
+        # ═══════════════════════════════════════════════════
+        if "filtro_followup" not in st.session_state:
+            if qtd_atrasados > 0:
+                st.session_state["filtro_followup"] = "ATRASADO"
+            elif qtd_hoje > 0:
+                st.session_state["filtro_followup"] = "HOJE"
+            elif qtd_amanha > 0:
+                st.session_state["filtro_followup"] = "AMANHA"
+            elif qtd_prox3 > 0:
+                st.session_state["filtro_followup"] = "PROXIMOS_3"
+            else:
+                st.session_state["filtro_followup"] = "DEMAIS"
+
+        # ═══════════════════════════════════════════════════
+        # CARDS COMO FILTROS CLICÁVEIS
+        # ═══════════════════════════════════════════════════
+        c1, c2, c3, c4, c5 = st.columns(5)
+
+        with c1:
+            if st.button(
+                f"🔴 ATRASADOS\n\n**{qtd_atrasados}**",
+                key="btn_atrasados",
+                width="stretch",
+                type="primary" if st.session_state["filtro_followup"] == "ATRASADO" else "secondary",
+            ):
+                st.session_state["filtro_followup"] = "ATRASADO"
+                st.rerun()
+
+        with c2:
+            if st.button(
+                f"🟡 HOJE\n\n**{qtd_hoje}**",
+                key="btn_hoje",
+                width="stretch",
+                type="primary" if st.session_state["filtro_followup"] == "HOJE" else "secondary",
+            ):
+                st.session_state["filtro_followup"] = "HOJE"
+                st.rerun()
+
+        with c3:
+            if st.button(
+                f"🔵 AMANHÃ\n\n**{qtd_amanha}**",
+                key="btn_amanha",
+                width="stretch",
+                type="primary" if st.session_state["filtro_followup"] == "AMANHA" else "secondary",
+            ):
+                st.session_state["filtro_followup"] = "AMANHA"
+                st.rerun()
+
+        with c4:
+            if st.button(
+                f"🟢 PRÓXIMOS\n3 DIAS\n\n**{qtd_prox3}**",
+                key="btn_prox3",
+                width="stretch",
+                type="primary" if st.session_state["filtro_followup"] == "PROXIMOS_3" else "secondary",
+            ):
+                st.session_state["filtro_followup"] = "PROXIMOS_3"
+                st.rerun()
+
+        with c5:
+            if st.button(
+                f"⚪ DEMAIS\n\n**{qtd_demais}**",
+                key="btn_demais",
+                width="stretch",
+                type="primary" if st.session_state["filtro_followup"] == "DEMAIS" else "secondary",
+            ):
+                st.session_state["filtro_followup"] = "DEMAIS"
+                st.rerun()
+
+        st.markdown("---")
+
+        # ═══════════════════════════════════════════════════
+        # TABELA ÚNICA CONFORME FILTRO SELECIONADO
+        # ═══════════════════════════════════════════════════
+
+        filtro = st.session_state["filtro_followup"]
+
+        # Mapeamento de categoria para config visual
+        CATEGORIAS_CONFIG = {
+            "ATRASADO": {
+                "titulo": "🔴 Follow-ups Atrasados",
+                "descricao": "Esses clientes deveriam ter sido contatados e exigem atenção imediata.",
+                "condicao": lambda d: d["categoria"] == "ATRASADO",
+            },
+            "HOJE": {
+                "titulo": "🟡 Follow-ups de Hoje",
+                "descricao": "Contatos programados para serem realizados hoje.",
+                "condicao": lambda d: d["categoria"] == "HOJE",
+            },
+            "AMANHA": {
+                "titulo": "🔵 Follow-ups de Amanhã",
+                "descricao": "Contatos previstos para amanhã. Prepare-se com antecedência.",
+                "condicao": lambda d: d["categoria"] == "AMANHA",
+            },
+            "PROXIMOS_3": {
+                "titulo": "🟢 Próximos 3 Dias",
+                "descricao": "Follow-ups programados para os próximos 3 dias.",
+                "condicao": lambda d: d["categoria"] == "PROXIMOS_3",
+            },
+            "DEMAIS": {
+                "titulo": "⚪ Demais Follow-ups",
+                "descricao": "Propostas com follow-up agendado para datas futuras.",
+                "condicao": lambda d: ~d["categoria"].isin(
+                    ["ATRASADO", "HOJE", "AMANHA", "PROXIMOS_3"]
+                ),
+            },
+        }
+
+        config = CATEGORIAS_CONFIG[filtro]
+        df_filtrado = df_propostas[config["condicao"](df_propostas)].sort_values(
+            "proximo_followup"
+        )
+        qtd_filtrado = len(df_filtrado)
+
+        # Título com resumo descritivo
+        st.markdown(f"### {config['titulo']} ({qtd_filtrado})")
+        st.caption(config["descricao"])
+
+        if df_filtrado.empty:
+            st.info("Nenhum registro nesta fila.")
+        else:
+            # Montar linhas formatadas (mesmo formato da função original)
+            linhas = []
+            for _, row in df_filtrado.iterrows():
+                dias = row["dias_restantes"]
+                if pd.isna(dias):
+                    dias_str = "—"
+                    badge = "⚪"
+                elif dias < 0:
+                    dias_str = f"{abs(int(dias))}d atraso"
+                    badge = "🔴"
+                elif dias == 0:
+                    dias_str = "Hoje"
+                    badge = "🟡"
+                elif dias == 1:
+                    dias_str = "Amanhã"
+                    badge = "🔵"
+                else:
+                    dias_str = f"{int(dias)}d restantes"
+                    badge = "🟢"
+
+                data_followup = (
+                    row["proximo_followup"].strftime("%d/%m/%Y")
+                    if pd.notna(row["proximo_followup"])
+                    else "—"
+                )
+
+                linhas.append({
+                    " ": badge,
+                    "OS": str(row["numero_os"]),
+                    "Cliente": row["cliente"] if pd.notna(row["cliente"]) else "—",
+                    "Responsável": row["responsavel"] if pd.notna(row["responsavel"]) else "—",
+                    "Próximo Follow-up": data_followup,
+                    "Prazo": dias_str,
+                    "Último Histórico": row["ultimo_historico"],
+                })
+
+            df_exibicao = pd.DataFrame(linhas)
+            st.dataframe(
+                df_exibicao,
+                width="stretch",
+                height=min(600, 35 * len(linhas) + 38),
+                hide_index=True,
+                column_config={
+                    " ": st.column_config.Column(width="small"),
+                    "OS": st.column_config.Column(width="small"),
+                    "Cliente": st.column_config.Column(width="medium"),
+                    "Responsável": st.column_config.Column(width="small"),
+                    "Próximo Follow-up": st.column_config.Column(width="small"),
+                    "Prazo": st.column_config.Column(width="small"),
+                    "Último Histórico": st.column_config.Column(width="large"),
+                },
+            )
+
+        st.markdown("---")
+
+        # ═══════════════════════════════════════════════════
+        # REGISTRAR FOLLOW-UP (mantido da versão original)
+        # ═══════════════════════════════════════════════════
+
         with st.container(border=True):
             st.subheader("📝 Registrar Follow-up Realizado")
 
@@ -736,56 +978,6 @@ with tab4:
                             f"Próximo agendado para {nova_data_followup.strftime('%d/%m/%Y')}."
                         )
                         st.rerun()
-
-        st.markdown("---")
-
-        # ── 2. Follow-ups Vencidos ──
-        df_vencidos = df_propostas[
-            df_propostas["proximo_followup"] < pd.Timestamp.today()
-        ].copy()
-        if not df_vencidos.empty:
-            with st.container(border=True):
-                st.subheader(f"🔴 Follow-ups Vencidos ({len(df_vencidos)})")
-                st.dataframe(
-                    df_vencidos[
-                        ["numero_os", "cliente", "responsavel", "valor_proposta", "proximo_followup"]
-                    ],
-                    width="stretch",
-                    height=200
-                )
-            st.markdown("---")
-
-        # ── 3. Follow-ups de Hoje ──
-        df_hoje = df_propostas[
-            df_propostas["proximo_followup"] == pd.Timestamp.today()
-        ].copy()
-        if not df_hoje.empty:
-            with st.container(border=True):
-                st.subheader(f"🟡 Follow-ups de Hoje ({len(df_hoje)})")
-                st.dataframe(
-                    df_hoje[
-                        ["numero_os", "cliente", "responsavel", "valor_proposta", "proximo_followup"]
-                    ],
-                    width="stretch",
-                    height=200
-                )
-            st.markdown("---")
-
-        # ── 4. Demais Follow-ups ──
-        df_demais = df_propostas[
-            (df_propostas["proximo_followup"] >= pd.Timestamp.today())
-            | (df_propostas["proximo_followup"].isna())
-        ].copy()
-        if not df_demais.empty:
-            with st.container(border=True):
-                st.subheader(f"🟢 Demais Follow-ups ({len(df_demais)})")
-                st.dataframe(
-                    df_demais[
-                        ["numero_os", "cliente", "responsavel", "valor_proposta", "data_envio_proposta", "proximo_followup"]
-                    ],
-                    width="stretch",
-                    height=300
-                )
 
 # =====================================================
 # FUNÇÃO AUXILIAR — Ações em Massa
