@@ -1668,8 +1668,11 @@ with aba6:
                     with st.container(border=True):
                         col_check, col_info = st.columns([1, 10])
                         with col_check:
+                            label_checkbox = str(nome).strip()
+                            if not label_checkbox:
+                                label_checkbox = "Selecionar"
                             checked = st.checkbox(
-                                "",
+                                label_checkbox,
                                 key=f"modulo_check_{nome}",
                                 value=(st.session_state["limpeza_modulo_selecionado"] == nome),
                                 label_visibility="collapsed",

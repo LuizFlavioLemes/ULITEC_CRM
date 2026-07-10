@@ -952,11 +952,27 @@ with tab4:
                         dias_followup_2 = int(get_config("followup_2", "7"))
                         dias_followup_3 = int(get_config("followup_3", "15"))
 
+                        # REGRA DE NEGÓCIO — Ciclo de follow-up:
+                        #
+                        # followup_1: intervalo entre o envio da proposta e o PRIMEIRO follow-up
+                        #             (aplicado automaticamente quando a proposta é enviada)
+                        # followup_2: intervalo entre o PRIMEIRO e o SEGUNDO follow-up
+                        # followup_3: intervalo entre TODOS os follow-ups seguintes (terceiro em diante)
+                        #
+                        # O followup_count indica quantos follow-ups JÁ foram registrados.
+                        # Portanto, a decisão do PRÓXIMO intervalo é baseada no count ATUAL:
+                        #   count == 0 → primeiro follow-up sendo registrado agora → próximo usa followup_2
+                        #   count == 1 → segundo follow-up sendo registrado agora  → próximo usa followup_3
+                        #   count >= 2 → terceiro follow-up em diante              → próximo usa followup_3
+                        #
+                        # Após o terceiro follow-up, o CRM continua lembrando o operador
+                        # indefinidamente, sempre utilizando o intervalo definido em followup_3.
                         if followup_count == 0:
-                            nova_data_followup = date.today() + pd.Timedelta(days=dias_followup_1)
-                        elif followup_count == 1:
                             nova_data_followup = date.today() + pd.Timedelta(days=dias_followup_2)
+                        elif followup_count == 1:
+                            nova_data_followup = date.today() + pd.Timedelta(days=dias_followup_3)
                         else:
+                            # followup_count >= 2: mantém followup_3 indefinidamente
                             nova_data_followup = date.today() + pd.Timedelta(days=dias_followup_3)
 
                         nova_data_followup_str = nova_data_followup.strftime("%Y-%m-%d")

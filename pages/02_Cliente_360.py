@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 
 import streamlit as st
 import pandas as pd
@@ -200,7 +200,8 @@ tabs = st.tabs(
         "Faturamento",
         "Oportunidades",
         "🤖 Análise IA",
-        "📞 Relacionamento"
+        "📞 Relacionamento",
+        "📋 OS Aguardando Aprovação",
     ]
 )
 
@@ -562,7 +563,7 @@ REGRAS CRUCIALMENTE OBRIGATÓRIAS:
                         "**Solução:**\n"
                         "1. Obtenha uma chave gratuita em: https://console.groq.com/keys\n"
                         "2. Configure `GROQ_API_KEY` no arquivo `.env`\n"
-                        "3. O modelo `llama-3.3-70b-versatile", "llama-3.1-8b-instant` é gratuito."
+                        "3. O modelo `llama-3.3-70b-versatile\", \"llama-3.1-8b-instant` é gratuito."
                     )
                 elif "429" in erro_str or "quota" in erro_str.lower() or "rate limit" in erro_str.lower():
                     st.warning("🚫 **Limite de taxa Groq excedido.** Aguarde e tente novamente.")
@@ -732,5 +733,336 @@ with tabs[6]:
             st.caption("Contatos extraídos do histórico de interações. Agrupados por nome.")
     except Exception as e:
         st.info("Nenhum contato conhecido.")
+
+# ==================================================
+# ABA 7 — 📋 OS AGUARDANDO APROVAÇÃO (PAINEL DE NEGOCIAÇÃO)
+# ==================================================
+
+with tabs[7]:
+
+    st.subheader("📋 OS Aguardando Aprovação — Painel de Negociação")
+
+    # ── Query única: TODAS as OS do cliente em negociação ──
+    df_os_negociacao = pd.read_sql_query(
+        """
+        SELECT
+            id,
+            numero_os,
+            status,
+            responsavel,
+            equipamento,
+            marca,
+            modelo,
+            valor_proposta,
+            data_recebimento,
+            data_envio_proposta,
+            proximo_followup,
+            followup_count,
+            observacoes
+        FROM ordens_servico
+        WHERE cliente_id = ?
+          AND status IN ('PROPOSTA ENVIADA', 'FOLLOW-UP')
+        ORDER BY
+            CASE WHEN proximo_followup < date('now') THEN 0
+                 WHEN proximo_followup = date('now') THEN 1
+                 WHEN proximo_followup = date('now', '+1 day') THEN 2
+                 ELSE 3
+            END,
+            proximo_followup ASC
+        """,
+        conn,
+        params=(cliente_id,),
+    )
+
+    hoje = date.today()
+
+    # ── Se não houver propostas, exibir card verde e sair ──
+    if df_os_negociacao.empty:
+
+        st.success("✅ Este cliente não possui propostas aguardando aprovação.")
+        st.stop()
+
+    # ── Derivar indicadores em memória (apenas 1 query) ──
+    qtd_aguardando = len(df_os_negociacao)
+    valor_total_aguardando = df_os_negociacao["valor_proposta"].fillna(0).sum()
+
+    # Proposta mais antiga (data_envio_proposta mais distante)
+    datas_envio = df_os_negociacao["data_envio_proposta"].dropna()
+    if not datas_envio.empty:
+        data_mais_antiga = pd.to_datetime(datas_envio.min())
+        dias_proposta_mais_antiga = (datetime.now() - data_mais_antiga).days
+    else:
+        data_mais_antiga = None
+        dias_proposta_mais_antiga = 0
+
+    # Follow-ups vencidos, hoje, amanhã
+    followups_vencidos = 0
+    followups_hoje = 0
+    followups_amanha = 0
+
+    for _, row in df_os_negociacao.iterrows():
+        prox_fu = row["proximo_followup"]
+        if pd.notna(prox_fu):
+            prox_fu_date = pd.to_datetime(prox_fu).date()
+            if prox_fu_date < hoje:
+                followups_vencidos += 1
+            elif prox_fu_date == hoje:
+                followups_hoje += 1
+            elif prox_fu_date == hoje + pd.Timedelta(days=1):
+                followups_amanha += 1
+
+    # Maior proposta
+    idx_maior = df_os_negociacao["valor_proposta"].fillna(0).idxmax()
+    maior_proposta_os = df_os_negociacao.loc[idx_maior, "numero_os"]
+    maior_proposta_valor = df_os_negociacao.loc[idx_maior, "valor_proposta"]
+
+    # ═══════════════════════════════════════════════
+    # PAINEL "RESUMO DA VISITA"
+    # ═══════════════════════════════════════════════
+
+    with st.container(border=True):
+        st.markdown("### 📋 Resumo da Visita")
+        st.caption("Informações consolidadas para preparação de visitas comerciais.")
+
+        col_r1, col_r2, col_r3, col_r4 = st.columns(4)
+        col_r1.metric("Propostas Aguardando", qtd_aguardando)
+        col_r2.metric("Valor Total", f"R$ {valor_total_aguardando:,.0f}")
+        col_r3.metric(
+            "Maior Proposta",
+            f"OS {maior_proposta_os} — R$ {maior_proposta_valor:,.0f}" if pd.notna(maior_proposta_valor) else "—"
+        )
+        col_r4.metric("Mais Antiga", f"{dias_proposta_mais_antiga} dias" if dias_proposta_mais_antiga > 0 else "—")
+
+        col_r5, col_r6, col_r7, col_r8 = st.columns(4)
+        col_r5.metric("🔴 Follow-ups Vencidos", followups_vencidos)
+        col_r6.metric("🟡 Follow-ups Hoje", followups_hoje)
+        col_r7.metric("🔵 Follow-ups Amanhã", followups_amanha)
+        col_r8.metric("💰 Valor Parado", f"R$ {valor_total_aguardando:,.0f}")
+
+    # ═══════════════════════════════════════════════
+    # INDICADORES EXECUTIVOS (cards no topo)
+    # ═══════════════════════════════════════════════
+
+    col_k1, col_k2, col_k3, col_k4 = st.columns(4)
+    col_k1.metric("📋 OS Aguardando Aprovação", qtd_aguardando)
+    col_k2.metric("💰 Valor Total Aguardando", f"R$ {valor_total_aguardando:,.0f}")
+    col_k3.metric("📅 Proposta Mais Antiga", f"{dias_proposta_mais_antiga} dias" if dias_proposta_mais_antiga > 0 else "—")
+    col_k4.metric("🔴 Follow-ups Vencidos", followups_vencidos)
+
+    col_k5, col_k6, col_k7, col_k8 = st.columns(4)
+    col_k5.metric("🟡 Follow-ups Hoje", followups_hoje)
+    col_k6.metric("🔵 Follow-ups Amanhã", followups_amanha)
+
+    st.divider()
+
+    # ═══════════════════════════════════════════════
+    # TABELA PRINCIPAL
+    # ═══════════════════════════════════════════════
+
+    st.markdown("### Propostas em Negociação")
+
+    # ── Função auxiliar: extrair último contato do histórico ──
+    def extrair_ultimo_contato(observacoes):
+        """Extrai a última interação registrada do campo observacoes.
+        Formato esperado: [dd/mm/aaaa]: texto
+        Retorna tupla (data, texto_resumido)"""
+        if pd.isna(observacoes) or not observacoes:
+            return ("—", "—")
+        linhas = str(observacoes).strip().split("\n")
+        linhas = [l.strip() for l in linhas if l.strip()]
+        if not linhas:
+            return ("—", "—")
+        primeira = linhas[0]
+        # Formato esperado: [dd/mm/aaaa]: texto
+        if "]: " in primeira:
+            partes = primeira.split("]: ", 1)
+            data = partes[0].replace("[", "").strip()
+            texto = partes[1].strip()
+        else:
+            data = ""
+            texto = primeira
+        # Limitar a ~80 caracteres
+        if len(texto) > 80:
+            texto = texto[:77] + "..."
+        return (data if data else "—", texto if texto else "—")
+
+    # ── Função: extrair histórico completo como timeline ──
+    def extrair_timeline(observacoes):
+        """Extrai todas as entradas do campo observacoes em ordem cronológica.
+        Retorna lista de dicts com data, icone, texto."""
+        if pd.isna(observacoes) or not observacoes:
+            return []
+        linhas = str(observacoes).strip().split("\n")
+        linhas = [l.strip() for l in linhas if l.strip()]
+        entradas = []
+        for linha in linhas:
+            if "]: " in linha:
+                partes = linha.split("]: ", 1)
+                data_raw = partes[0].replace("[", "").strip()
+                texto = partes[1].strip()
+                icone = "📞"  # Default: contato telefônico
+                if "proposta" in texto.lower() or "enviada" in texto.lower():
+                    icone = "📄"
+                elif "prometeu" in texto.lower() or "retorno" in texto.lower():
+                    icone = "📅"
+                elif "aprov" in texto.lower():
+                    icone = "✅"
+                elif "perdeu" in texto.lower() or "perd" in texto.lower():
+                    icone = "❌"
+                entradas.append({
+                    "data": data_raw,
+                    "icone": icone,
+                    "texto": texto,
+                })
+            else:
+                entradas.append({
+                    "data": "—",
+                    "icone": "📌",
+                    "texto": linha,
+                })
+        # Inverter para ordem cronológica (mais antigo primeiro)
+        entradas.reverse()
+        return entradas
+
+    # ── Clasificar status de follow-up para badge ──
+    def classificar_followup(data_followup):
+        if pd.isna(data_followup):
+            return ("⚪", "Sem follow-up")
+        data_fu = pd.to_datetime(data_followup).date() if hasattr(pd.to_datetime(data_followup), 'date') else data_followup
+        if isinstance(data_fu, str):
+            data_fu = pd.to_datetime(data_fu).date()
+        if data_fu < hoje:
+            return ("🔴", "Follow-up vencido")
+        elif data_fu == hoje:
+            return ("🟡", "Hoje")
+        elif data_fu == hoje + pd.Timedelta(days=1):
+            return ("🔵", "Amanhã")
+        else:
+            return ("🟢", "Dentro do prazo")
+
+    # ── Montar linhas da tabela ──
+    linhas_tabela = []
+    for _, row in df_os_negociacao.iterrows():
+        # Dias aguardando
+        if pd.notna(row["data_envio_proposta"]):
+            data_envio = pd.to_datetime(row["data_envio_proposta"])
+            dias_aguardando = (datetime.now() - data_envio).days
+        else:
+            dias_aguardando = 0
+
+        # Próximo follow-up
+        badge_fu, status_fu_texto = classificar_followup(row["proximo_followup"])
+        data_fu_str = pd.to_datetime(row["proximo_followup"]).strftime("%d/%m/%Y") if pd.notna(row["proximo_followup"]) else "—"
+
+        # Último contato
+        data_ult_contato, texto_ult_contato = extrair_ultimo_contato(row["observacoes"])
+
+        # Follow-up count
+        fup_count = row["followup_count"] if pd.notna(row["followup_count"]) else 0
+
+        # Negociação longa?
+        alerta_longa = ""
+        if dias_aguardando >= 90 or fup_count >= 10:
+            alerta_longa = "⚠ Negociação longa"
+
+        linhas_tabela.append({
+            "badge_fu": badge_fu,
+            "status_fu": status_fu_texto,
+            "OS": str(row["numero_os"]),
+            "Equipamento": row["equipamento"] if pd.notna(row["equipamento"]) else "—",
+            "Valor": row["valor_proposta"] if pd.notna(row["valor_proposta"]) else 0,
+            "Data Envio": pd.to_datetime(row["data_envio_proposta"]).strftime("%d/%m/%Y") if pd.notna(row["data_envio_proposta"]) else "—",
+            "Dias Aguardando": dias_aguardando,
+            "Próx. Follow-up": data_fu_str,
+            "Status Follow-up": status_fu_texto,
+            "Responsável": row["responsavel"] if pd.notna(row["responsavel"]) else "—",
+            "Qtd Follow-ups": int(fup_count),
+            "Último Contato": f"{data_ult_contato} — {texto_ult_contato}" if texto_ult_contato != "—" else "—",
+            "alerta_longa": alerta_longa,
+            "_id": row["id"],
+            "_numero_os": row["numero_os"],
+            "_observacoes": row["observacoes"],
+            "_followup_count": fup_count,
+            "_dias_aguardando": dias_aguardando,
+            "_data_envio": row["data_envio_proposta"],
+            "_responsavel": row["responsavel"],
+            "_equipamento": row["equipamento"],
+            "_proximo_followup": row["proximo_followup"],
+        })
+
+    df_exibicao = pd.DataFrame(linhas_tabela)
+
+    # ── Ordenação: vencido → hoje → amanhã → próximos → mais recentes ──
+    ordem_categoria = {
+        "Follow-up vencido": 0,
+        "Hoje": 1,
+        "Amanhã": 2,
+        "Dentro do prazo": 3,
+        "Sem follow-up": 4,
+    }
+    df_exibicao["_ordem"] = df_exibicao["Status Follow-up"].map(ordem_categoria)
+    df_exibicao = df_exibicao.sort_values(["_ordem", "Dias Aguardando"], ascending=[True, False]).reset_index(drop=True)
+
+    # ═══════════════════════════════════════════════
+    # RENDERIZAÇÃO DA TABELA COM EXPANDERS
+    # ═══════════════════════════════════════════════
+
+    for idx, row in df_exibicao.iterrows():
+
+        badge = row["badge_fu"]
+        os_numero = row["OS"]
+        valor = row["Valor"]
+        dias_ag = row["Dias Aguardando"]
+        alerta = row["alerta_longa"]
+        equip = row["Equipamento"]
+
+        # Título do expander
+        titulo_expander = f"{badge} **OS {os_numero}** — {equip} — R$ {valor:,.2f} — {dias_ag}d"
+        if alerta:
+            titulo_expander += f" | ⚠️ {alerta}"
+
+        with st.expander(titulo_expander, expanded=False):
+
+            # ── Informações principais ──
+            col_info1, col_info2, col_info3 = st.columns(3)
+            col_info1.markdown(f"**OS:** {os_numero}")
+            col_info1.markdown(f"**Equipamento:** {equip}")
+            col_info1.markdown(f"**Valor:** R$ {valor:,.2f}")
+
+            col_info2.markdown(f"**Data Envio:** {row['Data Envio']}")
+            col_info2.markdown(f"**Dias em Negociação:** {dias_ag}d")
+            col_info2.markdown(f"**Responsável:** {row['_responsavel']}")
+
+            col_info3.markdown(f"**Próx. Follow-up:** {row['Próx. Follow-up']}")
+            col_info3.markdown(f"**Qtd Follow-ups:** {int(row['_followup_count'])}")
+            col_info3.markdown(f"**Status:** {row['Status Follow-up']}")
+
+            # Alerta de negociação longa
+            if alerta:
+                st.warning(alerta)
+
+            # ── Histórico / Timeline ──
+            st.markdown("---")
+            st.markdown("### 📋 Histórico de Interações")
+
+            timeline = extrair_timeline(row["_observacoes"])
+            if timeline:
+                for entrada in timeline:
+                    with st.container(border=True):
+                        cols = st.columns([1, 5])
+                        cols[0].markdown(f"**{entrada['icone']}**")
+                        cols[1].markdown(f"**{entrada['data']}** — {entrada['texto']}")
+            else:
+                st.info("Nenhum histórico registrado para esta OS.")
+
+    # ═══════════════════════════════════════════════
+    # NOTA DE RODAPÉ
+    # ═══════════════════════════════════════════════
+
+    st.caption(
+        f"*Total de {len(df_exibicao)} OS em negociação. "
+        f"Valor parado: R$ {valor_total_aguardando:,.2f}. "
+        f"Dados atualizados dinamicamente.*"
+    )
 
 conn.close()
