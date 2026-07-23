@@ -1,6 +1,7 @@
 import sqlite3
 
 from config import DB_PATH
+from services.comissoes_db import run_comissoes_migrations
 
 
 def init_connection():
@@ -693,6 +694,11 @@ CREATE TABLE IF NOT EXISTS clientes (
 
     conn.commit()
     conn.close()
+
+    # ══════════════════════════════════════════════════════
+    # MIGRACOES DO MODULO GESTAO COMERCIAL
+    # ══════════════════════════════════════════════════════
+    run_comissoes_migrations()
 
     print("Banco ULITEC criado com sucesso!")
 

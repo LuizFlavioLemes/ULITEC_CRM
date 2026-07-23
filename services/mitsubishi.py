@@ -200,7 +200,14 @@ def importar_arquivo(arquivo_bytes):
             dealer = str(row.get("DEALER", "")).strip()
             warranty_start = str(row.get("WARRANTY START", "")).strip()
             warranty_end = str(row.get("WARRANTY END", "")).strip()
-            ano = str(row.get("Year", "")).strip()
+            try:
+                ano_raw = row.get("Year", "")
+                if pd.isna(ano_raw) or str(ano_raw).strip() == "":
+                    ano = None
+                else:
+                    ano = int(float(str(ano_raw).strip()))
+            except (ValueError, TypeError):
+                ano = None
 
             cursor.execute(
                 """
