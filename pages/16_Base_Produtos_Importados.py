@@ -1,4 +1,4 @@
-import sqlite3
+
 from datetime import date, timedelta
 
 import openpyxl
@@ -8,6 +8,8 @@ import streamlit as st
 from auth import sidebar_usuario
 from permissions import verificar_acesso_pagina
 
+from database import get_connection
+
 # ── Proteção ──
 verificar_acesso_pagina()
 sidebar_usuario()
@@ -15,7 +17,6 @@ sidebar_usuario()
 st.set_page_config(page_title="Base de Produtos Importados", layout="wide")
 
 st.title("📦 Base de Produtos Importados")
-
 
 # ============================================================
 # FUNÇÃO DE NORMALIZAÇÃO ÚNICA
@@ -27,14 +28,12 @@ def normalizar_modelo(texto):
         return ""
     return str(texto).strip().upper().replace("-", "").replace(" ", "")
 
-
 # ============================================================
 # FUNÇÕES DE BANCO DE DADOS
 # ============================================================
 
 def get_conn():
-    return sqlite3.connect("crm.db")
-
+    return get_connection()
 
 def carregar_config():
     conn = get_conn()
@@ -48,7 +47,6 @@ def carregar_config():
     conn.close()
     return configs
 
-
 def salvar_config(chave, valor):
     conn = get_conn()
     conn.execute("""
@@ -59,13 +57,11 @@ def salvar_config(chave, valor):
     conn.commit()
     conn.close()
 
-
 def carregar_tipos_produto():
     conn = get_conn()
     df = pd.read_sql("SELECT * FROM tipo_produto_importado WHERE ativo = 1 ORDER BY descricao", conn)
     conn.close()
     return df
-
 
 def salvar_tipo_produto(id, ii, ipi, pis, cofins, icms):
     conn = get_conn()
@@ -76,7 +72,6 @@ def salvar_tipo_produto(id, ii, ipi, pis, cofins, icms):
     """, (ii, ipi, pis, cofins, icms, id))
     conn.commit()
     conn.close()
-
 
 def carregar_ncms():
     conn = get_conn()
@@ -89,7 +84,6 @@ def carregar_ncms():
     """, conn)
     conn.close()
     return df
-
 
 def buscar_ncm_por_tipo_produto(tipo_produto_id):
     """Retorna o primeiro NCM ativo vinculado ao tipo_produto_id."""
@@ -105,7 +99,6 @@ def buscar_ncm_por_tipo_produto(tipo_produto_id):
     if row:
         return {"id": row[0], "ncm": row[1], "descricao": row[2]}
     return None
-
 
 def calcular_nacionalizacao(fob_usd, frete_rateado, dolar, ii_pct, ipi_pct, pis_pct, cofins_pct, icms_pct, despesas_aduaneiras):
     fob_freight_usd = fob_usd + frete_rateado
@@ -140,7 +133,6 @@ def calcular_nacionalizacao(fob_usd, frete_rateado, dolar, ii_pct, ipi_pct, pis_
         "valor_nacionalizado": valor_nacionalizado,
     }
 
-
 # ============================================================
 # NOVAS FUNÇÕES - FORNECEDORES
 # ============================================================
@@ -154,7 +146,6 @@ def carregar_fornecedores(apenas_ativos=True):
         df = pd.read_sql("SELECT * FROM fornecedores_produto ORDER BY nome", conn)
     conn.close()
     return df
-
 
 def cadastrar_fornecedor(nome, pais="", observacoes="", ativo=1):
     """Cadastra um novo fornecedor.
@@ -181,7 +172,6 @@ def cadastrar_fornecedor(nome, pais="", observacoes="", ativo=1):
         conn.close()
         return False, str(e)
 
-
 def atualizar_fornecedor(fornecedor_id, nome, pais, observacoes, ativo):
     """Atualiza dados de um fornecedor."""
     conn = get_conn()
@@ -197,7 +187,6 @@ def atualizar_fornecedor(fornecedor_id, nome, pais, observacoes, ativo):
     except Exception as e:
         conn.close()
         return False, str(e)
-
 
 # ============================================================
 # NOVAS FUNÇÕES - PRODUTOS (APENAS DADOS DO ITEM)
@@ -230,7 +219,6 @@ def buscar_produtos(termo):
     df = pd.read_sql(query, conn, params=(param, param, param, param_busca))
     conn.close()
     return df
-
 
 def sugerir_produtos(termo, limite=10):
     """
@@ -272,7 +260,6 @@ def sugerir_produtos(termo, limite=10):
     conn.close()
     return resultados
 
-
 def buscar_ofertas_por_produto(produto_id):
     """Busca todas as ofertas (fornecedores) de um produto."""
     conn = get_conn()
@@ -289,7 +276,6 @@ def buscar_ofertas_por_produto(produto_id):
     df = pd.read_sql(query, conn, params=(produto_id,))
     conn.close()
     return df
-
 
 def buscar_oferta_por_produto_fornecedor(produto_id, fornecedor_id):
     """Verifica se existe oferta para produto+fornecedor."""
@@ -308,7 +294,6 @@ def buscar_oferta_por_produto_fornecedor(produto_id, fornecedor_id):
             "observacoes": row[3],
         }
     return None
-
 
 def desativar_oferta(oferta_id, usuario_id=None):
     """Desativa (exclui logicamente) uma oferta de produto+fornecedor.
@@ -354,7 +339,6 @@ def desativar_oferta(oferta_id, usuario_id=None):
         conn.close()
         return False, str(e)
 
-
 def atualizar_oferta(oferta_id, fob_usd, data_fob, observacoes, usuario_id=None):
     """Atualiza apenas os dados da oferta (FOB, data, observações).
     Nunca altera dados do produto."""
@@ -397,7 +381,6 @@ def atualizar_oferta(oferta_id, fob_usd, data_fob, observacoes, usuario_id=None)
         conn.close()
         return False, str(e)
 
-
 def buscar_produto_por_modelo_norm(modelo):
     """Busca produto pelo modelo normalizado."""
     conn = get_conn()
@@ -426,7 +409,6 @@ def buscar_produto_por_modelo_norm(modelo):
             "descricao_ncm": row[9],
         }
     return None
-
 
 def cadastrar_ou_atualizar_oferta(modelo, descricao, tipo_produto_id, ncm_id, fornecedor_id, fob_usd, data_fob, observacoes, usuario_id):
     """
@@ -505,7 +487,6 @@ def cadastrar_ou_atualizar_oferta(modelo, descricao, tipo_produto_id, ncm_id, fo
         conn.close()
         return False, str(e), None
 
-
 # ============================================================
 # FUNÇÕES DE IMPORTACAO (ATUALIZADAS)
 # ============================================================
@@ -535,7 +516,6 @@ def obter_ou_criar_fornecedor(nome_fornecedor):
     ).fetchone()[0]
     conn.close()
     return novo_id
-
 
 # ============================================================
 # FUNÇÕES DE HISTÓRICO
@@ -585,7 +565,6 @@ def carregar_historico(produto_id=None, fornecedor_nome=None, fornecedor_id=None
     conn.close()
     return df
 
-
 def cadastrar_ncm(ncm, descricao, tipo_produto_id):
     conn = get_conn()
     try:
@@ -599,7 +578,6 @@ def cadastrar_ncm(ncm, descricao, tipo_produto_id):
     except Exception as e:
         conn.close()
         return False, str(e)
-
 
 # ============================================================
 # FUNÇÕES DE DASHBOARD / INDICADORES
@@ -655,7 +633,6 @@ def calcular_indicadores():
         "qtd_top": qtd_top,
     }
 
-
 def calcular_ranking_fornecedores():
     """Ranking completo de fornecedores com indicadores."""
     conn = get_conn()
@@ -675,7 +652,6 @@ def calcular_ranking_fornecedores():
     df = pd.read_sql(query, conn)
     conn.close()
     return df
-
 
 def calcular_melhor_fornecedor():
     """
@@ -711,7 +687,6 @@ def calcular_melhor_fornecedor():
     ranking = sorted(vitorias.items(), key=lambda x: x[1], reverse=True)
     return ranking
 
-
 def calcular_economia_potencial():
     """
     Para cada produto, calcula a diferença entre maior e menor FOB.
@@ -745,7 +720,6 @@ def calcular_economia_potencial():
         df["diferenca"] = df["maior_fob"] - df["menor_fob"]
     
     return df
-
 
 # ============================================================
 # ABAS
@@ -874,7 +848,6 @@ with abas[0]:
             st.bar_chart(df_fob_medio, x="nome", y="fob_medio", width="stretch")
     else:
         st.info("Nenhum dado disponível para gráficos de fornecedores.")
-
 
 # ============================================================
 # ABA 1 - CONSULTA PRODUTOS
@@ -1235,7 +1208,6 @@ with abas[1]:
                     else:
                         st.info("Nenhum fornecedor cadastrado para este produto.")
 
-
 # ============================================================
 # ABA 2 - CADASTRO PRODUTO (BUSCA INTELIGENTE)
 # ============================================================
@@ -1493,7 +1465,6 @@ with abas[2]:
                 st.rerun()
             else:
                 st.error(f"Erro: {msg}")
-
 
 # ============================================================
 # ABA 3 - IMPORTAR PLANILHA FORNECEDOR
@@ -1850,7 +1821,6 @@ with abas[3]:
         except Exception as e:
             st.error(f"Erro ao processar planilha: {str(e)}")
 
-
 # ============================================================
 # ABA 4 - CONFIGURAÇÕES
 # ============================================================
@@ -2087,7 +2057,6 @@ with abas[4]:
                         st.rerun()
                     else:
                         st.error(msg)
-
 
 # ============================================================
 # ABA 5 - HISTÓRICO FOB

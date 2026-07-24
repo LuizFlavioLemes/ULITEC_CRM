@@ -38,7 +38,6 @@ Formato obrigatório da resposta:
    - Ações concretas e priorizadas para o comercial.
 """.strip()
 
-
 def montar_contexto_cliente(
     cliente: dict,
     faturamento: dict,
@@ -141,7 +140,6 @@ def montar_contexto_cliente(
 
     return "\n".join(linhas)
 
-
 def montar_contexto_relatorio_tecnico(
     descricao_tecnica: str,
     cliente: str = "",
@@ -231,7 +229,6 @@ def montar_contexto_relatorio_tecnico(
     linhas.append("Siga rigorosamente a estrutura: SINTOMA, CAUSA, SOLUÇÃO, OBSERVAÇÕES.")
 
     return "\n".join(linhas)
-
 
 def montar_prompt_completo(
     cliente: dict,

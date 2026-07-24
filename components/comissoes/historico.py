@@ -8,7 +8,6 @@ import streamlit as st
 from components import tabela_padrao
 from services.comissoes_consultas import listar_fechamentos_para_historico
 
-
 def render():
     """Renderiza a aba de Historico."""
     hoje = date.today()

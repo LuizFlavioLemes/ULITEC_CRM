@@ -12,7 +12,6 @@ from typing import Optional
 
 from services.comissoes_db import get_conn
 
-
 def _calcular_periodo(periodo: str) -> tuple:
     """
     Retorna (data_inicio, data_fim) com base no periodo selecionado.
@@ -45,7 +44,6 @@ def _calcular_periodo(periodo: str) -> tuple:
         data_inicio = date(2020, 1, 1)
         data_fim = hoje
     return data_inicio.isoformat(), data_fim.isoformat()
-
 
 def indicadores_gerais() -> dict:
     """
@@ -131,7 +129,6 @@ def indicadores_gerais() -> dict:
     conn.close()
     return resultado
 
-
 def indicadores_por_periodo(ano: int, mes: Optional[int] = None) -> dict:
     """
     Retorna KPIs filtrados por período.
@@ -179,7 +176,6 @@ def indicadores_por_periodo(ano: int, mes: Optional[int] = None) -> dict:
         "total_pendente": round(row[4] or 0.0, 2),
     }
 
-
 def top_parceiros(limite: int = 5) -> list:
     """
     Retorna ranking de parceiros por comissão fechada.
@@ -208,7 +204,6 @@ def top_parceiros(limite: int = 5) -> list:
         }
         for r in rows
     ]
-
 
 def top_clientes(limite: int = 5) -> list:
     """
@@ -244,14 +239,12 @@ def top_clientes(limite: int = 5) -> list:
         for nome, valor in ranking[:limite]
     ]
 
-
 def avulsas_proximas() -> list:
     """
     Retorna comissões avulsas com pagamento previsto para os próximos 7 dias.
     """
     from services.comissoes_db import query_comissoes_avulsas_abertas
     return query_comissoes_avulsas_abertas()
-
 
 def resumo_competencia(competencia: str) -> dict:
     """

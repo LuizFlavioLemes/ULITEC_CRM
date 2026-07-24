@@ -44,7 +44,6 @@ def _obter_config() -> dict:
 
     return config
 
-
 def gerar_relatorio(
     api_key: str = "",
     modelo: str = "",

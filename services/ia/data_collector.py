@@ -3,16 +3,15 @@ Coleta dados do banco para alimentar o prompt da IA.
 Cada fonte de dados tem sua própria função para facilitar manutenção e crescimento futuro.
 """
 
-import sqlite3
 import pandas as pd
 from datetime import datetime, timedelta
 
 from config import DB_PATH
 
+from database import get_connection
 
 def _get_conn():
-    return sqlite3.connect(str(DB_PATH))
-
+    return get_connection()
 
 def coletar_cliente(cliente_id: int) -> dict:
     """Dados cadastrais do cliente."""
@@ -33,7 +32,6 @@ def coletar_cliente(cliente_id: int) -> dict:
         return df.iloc[0].to_dict()
     finally:
         conn.close()
-
 
 def coletar_faturamento(cliente_id: int) -> dict:
     """
@@ -77,7 +75,6 @@ def coletar_faturamento(cliente_id: int) -> dict:
     finally:
         conn.close()
 
-
 def coletar_os(cliente_id: int) -> dict:
     """
     Ordens de serviço dos últimos 24 meses.
@@ -120,7 +117,6 @@ def coletar_os(cliente_id: int) -> dict:
     finally:
         conn.close()
 
-
 def coletar_oportunidades(cliente_id: int) -> dict:
     """
     Oportunidades do cliente.
@@ -161,7 +157,6 @@ def coletar_oportunidades(cliente_id: int) -> dict:
     finally:
         conn.close()
 
-
 def coletar_mitsubishi(cliente_id: int) -> dict:
     """
     Máquinas Mitsubishi do cliente.
@@ -194,7 +189,6 @@ def coletar_mitsubishi(cliente_id: int) -> dict:
         }
     finally:
         conn.close()
-
 
 def coletar_interacoes(cliente_id: int) -> list:
     """

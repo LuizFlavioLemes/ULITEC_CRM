@@ -1,14 +1,14 @@
 import pandas as pd
-import sqlite3
+
 import re
 from rapidfuzz import process, fuzz
 
 from config import DB_PATH
 
+from database import get_connection
 
 def _get_conn():
-    return sqlite3.connect(str(DB_PATH))
-
+    return get_connection()
 
 # ============================================================
 # INDICADORES
@@ -46,7 +46,6 @@ def get_indicadores():
     finally:
         conn.close()
 
-
 def get_nc_series_agrupado():
     conn = _get_conn()
     try:
@@ -63,7 +62,6 @@ def get_nc_series_agrupado():
     finally:
         conn.close()
 
-
 def get_maquinas_por_estado():
     conn = _get_conn()
     try:
@@ -79,7 +77,6 @@ def get_maquinas_por_estado():
         )
     finally:
         conn.close()
-
 
 def get_top_clientes_mitsubishi(limite=20):
     conn = _get_conn()
@@ -99,7 +96,6 @@ def get_top_clientes_mitsubishi(limite=20):
     finally:
         conn.close()
 
-
 def get_todos_clientes_mitsubishi():
     """Retorna todos os clientes com máquinas Mitsubishi sem limite."""
     conn = _get_conn()
@@ -117,7 +113,6 @@ def get_todos_clientes_mitsubishi():
         )
     finally:
         conn.close()
-
 
 def get_maquinas_por_nc_series(nc_series=None):
     """Retorna máquinas filtradas por série CNC. Se None, lista todas as séries disponíveis."""
@@ -150,7 +145,6 @@ def get_maquinas_por_nc_series(nc_series=None):
     finally:
         conn.close()
 
-
 def get_ultimas_importadas(limite=20):
     conn = _get_conn()
     try:
@@ -166,7 +160,6 @@ def get_ultimas_importadas(limite=20):
         )
     finally:
         conn.close()
-
 
 # ============================================================
 # IMPORTAÇÃO
@@ -241,7 +234,6 @@ def importar_arquivo(arquivo_bytes):
     finally:
         conn.close()
 
-
 # ============================================================
 # CONCILIAÇÃO
 # ============================================================
@@ -265,7 +257,6 @@ def limpar_nome(nome):
     nome = re.sub(r"[^A-Z0-9 ]", " ", nome)
     nome = re.sub(r"\s+", " ", nome)
     return nome.strip()
-
 
 def executar_conciliacao():
     """
@@ -366,7 +357,6 @@ def executar_conciliacao():
     finally:
         conn.close()
 
-
 def get_conciliacao_pendencias(limite=200):
     """Retorna DataFrame com pendências de conciliação em revisão."""
     conn = _get_conn()
@@ -398,7 +388,6 @@ def get_conciliacao_pendencias(limite=200):
     finally:
         conn.close()
 
-
 def get_clientes_para_vinculo():
     """Retorna DataFrame de clientes para selectbox."""
     conn = _get_conn()
@@ -413,7 +402,6 @@ def get_clientes_para_vinculo():
         )
     finally:
         conn.close()
-
 
 def get_maquinas_sem_cliente():
     """Retorna máquinas Mitsubishi sem cliente vinculado."""
@@ -430,7 +418,6 @@ def get_maquinas_sem_cliente():
         )
     finally:
         conn.close()
-
 
 def get_maquinas_por_filtro(filtro="TODOS"):
     """
@@ -455,7 +442,6 @@ def get_maquinas_por_filtro(filtro="TODOS"):
         return pd.read_sql_query(query, conn)
     finally:
         conn.close()
-
 
 # ============================================================
 # REVISÃO / VALIDAÇÃO
@@ -487,7 +473,6 @@ def aprovar_sugestao(conciliacao_id, maquina_id, cliente_sugerido_id, score):
     finally:
         conn.close()
 
-
 def vincular_manual(conciliacao_id, maquina_id, cliente_id, score, cliente_nome):
     """Vincula máquina a um cliente manualmente selecionado."""
     conn = _get_conn()
@@ -518,7 +503,6 @@ def vincular_manual(conciliacao_id, maquina_id, cliente_id, score, cliente_nome)
     finally:
         conn.close()
 
-
 def rejeitar_sugestao(conciliacao_id):
     """Rejeita sugestão de conciliação."""
     conn = _get_conn()
@@ -533,7 +517,6 @@ def rejeitar_sugestao(conciliacao_id):
         return {"sucesso": False, "erro": str(e)}
     finally:
         conn.close()
-
 
 def excluir_vinculo(maquina_id):
     """Remove vínculo entre máquina e cliente."""
@@ -552,7 +535,6 @@ def excluir_vinculo(maquina_id):
     finally:
         conn.close()
 
-
 def _atualizar_contagem(conn):
     conn.execute(
         """
@@ -564,7 +546,6 @@ def _atualizar_contagem(conn):
         )
         """
     )
-
 
 def get_duplicidades():
     """Retorna máquinas com mesmo serial_number duplicado."""

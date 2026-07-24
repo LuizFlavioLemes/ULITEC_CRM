@@ -27,16 +27,13 @@ _HIERARQUIA = {
 
 PERFIS_VALIDOS = list(_HIERARQUIA.keys())
 
-
 def _get_perfil() -> str:
     """Retorna o perfil do usuário logado ou string vazia."""
     return st.session_state.get("perfil", "")
 
-
 def _get_nivel() -> int:
     """Retorna o nível hierárquico do perfil atual (-1 se não logado/inválido)."""
     return _HIERARQUIA.get(_get_perfil(), -1)
-
 
 # ═══════════════════════════════════════════════════════════
 # 2. MATRIZ DE PERMISSÕES (BASE ÚNICA)
@@ -85,7 +82,6 @@ _PERMISSOES_BASE = {
 # Cache de permissões calculadas por perfil
 _CACHE_PERMISSOES = {}
 
-
 def _get_permissoes(perfil: str) -> dict:
     """
     Retorna o dicionário completo de permissões para um perfil,
@@ -109,16 +105,13 @@ def _get_permissoes(perfil: str) -> dict:
     _CACHE_PERMISSOES[perfil] = permissoes
     return permissoes
 
-
 def _get_permissoes_usuario() -> dict:
     """Retorna as permissões do usuário logado."""
     return _get_permissoes(_get_perfil())
 
-
 # ═══════════════════════════════════════════════════════════
 # 3. VERIFICAÇÕES DE PERFIL
 # ═══════════════════════════════════════════════════════════
-
 
 def tem_acesso(*perfis_autorizados: str) -> bool:
     """
@@ -133,7 +126,6 @@ def tem_acesso(*perfis_autorizados: str) -> bool:
         return False
     return _get_perfil() in perfis_autorizados
 
-
 def tem_acesso_minimo(perfil_minimo: str) -> bool:
     """
     Verifica se o usuário possui nível hierárquico >= ao perfil mínimo.
@@ -146,26 +138,20 @@ def tem_acesso_minimo(perfil_minimo: str) -> bool:
         return False
     return _get_nivel() >= _HIERARQUIA.get(perfil_minimo, -1)
 
-
 def eh_master() -> bool:
     return _get_perfil() == "MASTER"
-
 
 def eh_socio() -> bool:
     return _get_perfil() == "SÓCIO"
 
-
 def eh_gerente() -> bool:
     return _get_perfil() == "GERENTE"
-
 
 def eh_operador() -> bool:
     return _get_perfil() == "OPERADOR"
 
-
 def eh_consulta() -> bool:
     return _get_perfil() == "CONSULTA"
-
 
 # ═══════════════════════════════════════════════════════════
 # 4. PERMISSÕES FUNCIONAIS (baseadas na MATRIZ)
@@ -174,41 +160,34 @@ def eh_consulta() -> bool:
 # Cada função consulta a matriz de permissões.
 # MASTER herda automaticamente todas as permissões do SÓCIO.
 
-
 def pode_visualizar() -> bool:
     """Qualquer perfil autenticado pode visualizar."""
     return st.session_state.get("usuario_logado", False)
-
 
 def pode_editar() -> bool:
     """MASTER, SÓCIO, GERENTE e OPERADOR podem editar. CONSULTA não."""
     permissoes = _get_permissoes_usuario()
     return permissoes.get("editar", False)
 
-
 def pode_excluir() -> bool:
     """MASTER, SÓCIO e GERENTE podem excluir. OPERADOR e CONSULTA não."""
     permissoes = _get_permissoes_usuario()
     return permissoes.get("excluir", False)
-
 
 def pode_importar() -> bool:
     """MASTER, SÓCIO e GERENTE podem importar dados."""
     permissoes = _get_permissoes_usuario()
     return permissoes.get("importar", False)
 
-
 def pode_administrar() -> bool:
     """MASTER e SÓCIO podem administrar o sistema."""
     permissoes = _get_permissoes_usuario()
     return permissoes.get("administrar", False)
 
-
 def pode_desenvolver() -> bool:
     """Apenas MASTER pode acessar ferramentas de desenvolvimento."""
     permissoes = _get_permissoes_usuario()
     return permissoes.get("desenvolver", False)
-
 
 def pode_selecionar_unidade() -> bool:
     """
@@ -218,17 +197,14 @@ def pode_selecionar_unidade() -> bool:
     permissoes = _get_permissoes_usuario()
     return permissoes.get("selecionar_unidade", False)
 
-
 # ═══════════════════════════════════════════════════════════
 # 5. PERMISSÕES ADMINISTRATIVAS (baseadas na MATRIZ)
 # ═══════════════════════════════════════════════════════════
-
 
 def pode_gerenciar_usuarios() -> bool:
     """MASTER e SÓCIO podem gerenciar usuários (criar, editar, excluir)."""
     permissoes = _get_permissoes_usuario()
     return permissoes.get("gerenciar_usuarios", False)
-
 
 def pode_gerenciar_usuarios_limitado() -> bool:
     """
@@ -238,7 +214,6 @@ def pode_gerenciar_usuarios_limitado() -> bool:
     permissoes = _get_permissoes_usuario()
     return permissoes.get("gerenciar_usuarios_limitado", False)
 
-
 # ═══════════════════════════════════════════════════════════
 # 6. PERMISSÕES POR ABA (ADMINISTRAÇÃO E FUTURAS PÁGINAS)
 # ═══════════════════════════════════════════════════════════
@@ -246,11 +221,9 @@ def pode_gerenciar_usuarios_limitado() -> bool:
 # Cada aba pode ter sua própria permissão.
 # Uso futuro: pode_ver_aba("parametros") em qualquer página.
 
-
 def _pode_ver_aba(perfil_minimo: str) -> bool:
     """Helper: verifica se o usuário tem nível >= ao perfil mínimo."""
     return _get_nivel() >= _HIERARQUIA.get(perfil_minimo, -1)
-
 
 def pode_ver_aba_usuarios() -> bool:
     """
@@ -260,46 +233,37 @@ def pode_ver_aba_usuarios() -> bool:
     """
     return _pode_ver_aba("GERENTE")
 
-
 def pode_ver_aba_parametros() -> bool:
     """MASTER e SÓCIO. GERENTE não acessa."""
     return _pode_ver_aba("SÓCIO")
-
 
 def pode_ver_aba_backup() -> bool:
     """MASTER e SÓCIO."""
     return _pode_ver_aba("SÓCIO")
 
-
 def pode_ver_aba_banco() -> bool:
     """Apenas MASTER."""
     return eh_master()
-
 
 def pode_ver_aba_dev() -> bool:
     """Apenas MASTER (ferramentas de desenvolvimento, logs, diagnósticos)."""
     return eh_master()
 
-
 def pode_ver_aba_classificacao() -> bool:
     """MASTER e SÓCIO. GERENTE pode visualizar."""
     return _pode_ver_aba("SÓCIO")
-
 
 def pode_ver_aba_relacionamento() -> bool:
     """MASTER, SÓCIO e GERENTE."""
     return _pode_ver_aba("GERENTE")
 
-
 def pode_ver_aba_bi() -> bool:
     """MASTER e SÓCIO."""
     return _pode_ver_aba("SÓCIO")
 
-
 # ═══════════════════════════════════════════════════════════
 # 7. VALIDAÇÕES DE PÁGINA (PROTEÇÃO)
 # ═══════════════════════════════════════════════════════════
-
 
 def verificar_acesso_pagina(*perfis_autorizados: str):
     """
@@ -321,7 +285,6 @@ def verificar_acesso_pagina(*perfis_autorizados: str):
             f"🚫 Acesso negado. Perfil necessário: {', '.join(perfis_autorizados)}"
         )
         st.stop()
-
 
 # ═══════════════════════════════════════════════════════════
 # 7. MATRIZ DE PERMISSÕES (EXPOSTA PARA CONSULTA)

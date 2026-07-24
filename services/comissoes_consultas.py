@@ -20,7 +20,6 @@ from services.comissoes_db import (
     get_conn,
 )
 
-
 def listar_parceiros_com_carteira() -> list:
     """
     Retorna lista de parceiros ativos com:
@@ -56,7 +55,6 @@ def listar_parceiros_com_carteira() -> list:
         })
     return resultados
 
-
 def listar_clientes_carteira(parceiro_id: int) -> list:
     """
     Retorna dados completos dos clientes da carteira de um parceiro.
@@ -86,7 +84,6 @@ def listar_clientes_carteira(parceiro_id: int) -> list:
             "faturamento_12m": r[6],
         })
     return resultados
-
 
 def listar_fechamentos_para_historico(ano: Optional[int] = None,
                                       parceiro_id: Optional[int] = None) -> list:
@@ -144,7 +141,6 @@ def listar_fechamentos_para_historico(ano: Optional[int] = None,
             "observacao_pagamento": r[14],
         })
     return resultados
-
 
 def listar_comissoes_avulsas(parceiro_id: Optional[int] = None) -> list:
     """
@@ -206,7 +202,6 @@ def listar_comissoes_avulsas(parceiro_id: Optional[int] = None) -> list:
             "criado_em": r[14],
         })
     return resultados
-
 
 def listar_clientes_para_select() -> tuple:
     """

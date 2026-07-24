@@ -11,7 +11,6 @@ PLANO GRATUITO:
 import time
 from groq import Groq
 
-
 PRECOS = {
     "llama-3.3-70b-versatile": {"input": 0.59 / 1_000_000, "output": 0.79 / 1_000_000},
     "llama-3.1-8b-instant": {"input": 0.05 / 1_000_000, "output": 0.08 / 1_000_000},
@@ -19,7 +18,6 @@ PRECOS = {
     "mixtral-8x7b-32768": {"input": 0.24 / 1_000_000, "output": 0.24 / 1_000_000},
     "gemma2-9b-it": {"input": 0.20 / 1_000_000, "output": 0.20 / 1_000_000},
 }
-
 
 def testar_conexao(api_key: str) -> tuple:
     """
@@ -35,7 +33,6 @@ def testar_conexao(api_key: str) -> tuple:
         return True, f"✅ Conexão Groq OK. {len(modelos.data)} modelos disponíveis."
     except Exception as e:
         return False, f"❌ Falha na conexão Groq: {str(e)}"
-
 
 def gerar_relatorio(
     api_key: str,

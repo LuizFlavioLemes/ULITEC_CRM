@@ -17,7 +17,6 @@ from services.comissoes_consultas import (
 ESCOPOS = ["GRUPO", "ULITEC SP", "ULITEC RS"]
 BASES = ["BRUTO", "LIQUIDO"]
 
-
 def _render_form(editando_id=None):
     """Renderiza formulario integrado de parceiro + contrato + carteira."""
     editando = None
@@ -117,7 +116,6 @@ def _render_form(editando_id=None):
         st.rerun()
 
     return True
-
 
 def render():
     """Renderiza a aba de Parceiros."""

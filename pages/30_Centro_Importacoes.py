@@ -1,12 +1,14 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
+
 import re
 from datetime import datetime, date
 
 from auth import sidebar_usuario
 from permissions import verificar_acesso_pagina, pode_importar
 from services import formatar_clientes_para_select
+
+from database import get_connection
 
 # ── Proteção: MASTER, SÓCIO ou GERENTE ──
 verificar_acesso_pagina("MASTER", "SÓCIO", "GERENTE")
@@ -21,7 +23,7 @@ st.title("📥 Centro de Importações")
 st.markdown("Centralize todas as importações de dados do sistema.")
 
 # ── Conexão BD ──
-conn = sqlite3.connect("crm.db")
+conn = get_connection()
 
 # ═══════════════════════════════════════════════════════════
 # CONSTANTES COMPARTILHADAS
@@ -37,7 +39,6 @@ PADRAO_MENSAL = re.compile(
     re.IGNORECASE
 )
 
-
 def parse_coluna_mensal(nome_coluna: str):
     """Converte 'Jun/25' -> date(2025, 6, 1). Retorna None se não for mês."""
     nome_limpo = str(nome_coluna).strip()
@@ -51,7 +52,6 @@ def parse_coluna_mensal(nome_coluna: str):
     else:
         ano = int(ano_str)
     return date(ano, mes, 1)
-
 
 # ═══════════════════════════════════════════════════════════
 # ABAS

@@ -11,12 +11,12 @@ Serviço central do pilar de relacionamento:
 
 from datetime import datetime, date, timedelta
 from typing import Optional, List
-import sqlite3
 
 import pandas as pd
 
 from config import DB_PATH
 
+from database import get_connection
 
 # ──────────────────────────────────────────────
 # CONSTANTES
@@ -76,14 +76,12 @@ CHAVES_CONFIG = [
     "expedicao", "feedback_cliente",
 ]
 
-
 # ──────────────────────────────────────────────
 # CONEXÃO
 # ──────────────────────────────────────────────
 
-def _get_conn() -> sqlite3.Connection:
-    return sqlite3.connect(str(DB_PATH))
-
+def _get_conn():
+    return get_connection()
 
 # ──────────────────────────────────────────────
 # CONFIGURAÇÕES
@@ -99,7 +97,6 @@ def get_config(chave: str, valor_padrao: str = "30") -> str:
     finally:
         conn.close()
 
-
 def set_config(chave: str, valor: str, descricao: str = "") -> None:
     conn = _get_conn()
     try:
@@ -114,7 +111,6 @@ def set_config(chave: str, valor: str, descricao: str = "") -> None:
         conn.commit()
     finally:
         conn.close()
-
 
 def salvar_configs_relacionamento(params: dict) -> None:
     descricoes = {
@@ -150,13 +146,11 @@ def salvar_configs_relacionamento(params: dict) -> None:
         desc = descricoes.get(chave, "")
         set_config(chave, str(valor), desc)
 
-
 def carregar_configs_relacionamento() -> dict:
     configs = {}
     for chave in CHAVES_CONFIG:
         configs[chave] = get_config(chave, "30")
     return configs
-
 
 # ──────────────────────────────────────────────
 # INTERAÇÕES
@@ -264,7 +258,6 @@ def registrar_interacao(
     finally:
         conn.close()
 
-
 def get_historico_interacoes(
     cliente_id: Optional[int] = None,
     responsavel: Optional[str] = None,
@@ -343,7 +336,6 @@ def get_historico_interacoes(
     finally:
         conn.close()
 
-
 def get_agenda(
     dias_frente: int = 30,
     responsavel: Optional[str] = None,
@@ -413,7 +405,6 @@ def get_agenda(
     finally:
         conn.close()
 
-
 # ──────────────────────────────────────────────
 # PENDÊNCIAS COMERCIAIS
 # ──────────────────────────────────────────────
@@ -454,7 +445,6 @@ def criar_pendencia(
         raise e
     finally:
         conn.close()
-
 
 def get_pendencias(
     status: Optional[str] = None,
@@ -509,7 +499,6 @@ def get_pendencias(
     finally:
         conn.close()
 
-
 def concluir_pendencia(pendencia_id: int) -> None:
     conn = _get_conn()
     try:
@@ -520,7 +509,6 @@ def concluir_pendencia(pendencia_id: int) -> None:
         conn.commit()
     finally:
         conn.close()
-
 
 # ── v1.0.5: NOVAS FUNÇÕES DE GESTÃO DE PENDÊNCIAS ──
 
@@ -563,7 +551,6 @@ def atualizar_pendencia(
     finally:
         conn.close()
 
-
 def reabrir_pendencia(pendencia_id: int) -> None:
     """Reabre uma pendência concluída, voltando status para ABERTA."""
     conn = _get_conn()
@@ -576,12 +563,11 @@ def reabrir_pendencia(pendencia_id: int) -> None:
     finally:
         conn.close()
 
-
 def get_pendencia_by_id(pendencia_id: int) -> Optional[dict]:
     """Retorna dados completos de uma pendência pelo ID."""
     conn = _get_conn()
     try:
-        conn.row_factory = sqlite3.Row
+        conn.row_factory = dict
         row = conn.execute(
             """
             SELECT p.id, p.cliente_id, c.razao_social AS cliente,
@@ -603,7 +589,6 @@ def get_pendencia_by_id(pendencia_id: int) -> Optional[dict]:
         return None
     finally:
         conn.close()
-
 
 # ──────────────────────────────────────────────
 # OPORTUNIDADES
@@ -644,7 +629,6 @@ def criar_oportunidade(
         raise e
     finally:
         conn.close()
-
 
 # ──────────────────────────────────────────────
 # ALERTAS
@@ -745,7 +729,6 @@ def get_alertas_relacionamento(unidade: Optional[str] = None) -> list:
     finally:
         conn.close()
 
-
 # ──────────────────────────────────────────────
 # INDICADORES PARA CLIENTE 360
 # ──────────────────────────────────────────────
@@ -810,7 +793,6 @@ def get_indicadores_relacionamento(cliente_id: int) -> dict:
     finally:
         conn.close()
 
-
 # ──────────────────────────────────────────────
 # EVOLUÇÕES DE PENDÊNCIAS (v1.3)
 # ──────────────────────────────────────────────
@@ -824,7 +806,6 @@ TIPOS_EVOLUCAO = [
     "ALTERACAO_PRIORIDADE",
     "ALTERACAO_RESPONSAVEL",
 ]
-
 
 def criar_evolucao_pendencia(
     pendencia_id: int,
@@ -877,7 +858,6 @@ def criar_evolucao_pendencia(
     finally:
         conn.close()
 
-
 def get_evolucoes_pendencia(pendencia_id: int) -> pd.DataFrame:
     """
     Retorna todas as evoluções de uma pendência, ordenadas da mais recente para a mais antiga.
@@ -902,7 +882,6 @@ def get_evolucoes_pendencia(pendencia_id: int) -> pd.DataFrame:
         return df
     finally:
         conn.close()
-
 
 def concluir_pendencia_com_evolucao(
     pendencia_id: int,
@@ -941,7 +920,6 @@ def concluir_pendencia_com_evolucao(
     finally:
         conn.close()
 
-
 def reabrir_pendencia_com_evolucao(
     pendencia_id: int,
     usuario_id: Optional[int] = None,
@@ -978,7 +956,6 @@ def reabrir_pendencia_com_evolucao(
         raise e
     finally:
         conn.close()
-
 
 # ──────────────────────────────────────────────
 # v1.1 — NOVAS FUNÇÕES PARA CENTRAL DE OPORTUNIDADES (AGENDA OPERACIONAL)
@@ -1107,7 +1084,6 @@ def get_proximas_acoes_consolidadas(
     finally:
         conn.close()
 
-
 def get_contagem_proximas_acoes() -> dict:
     """
     Retorna contagens para cards: atrasadas, hoje, próximos 7 dias, próximos 30 dias.
@@ -1176,7 +1152,6 @@ def get_contagem_proximas_acoes() -> dict:
     finally:
         conn.close()
 
-
 # ──────────────────────────────────────────────
 # v1.1 — FUNÇÕES PARA CLIENTE 360 (RESUMO EXECUTIVO)
 # ──────────────────────────────────────────────
@@ -1218,13 +1193,11 @@ def get_ultimo_contato(cliente_id: int) -> Optional[dict]:
     finally:
         conn.close()
 
-
 def get_pendencias_abertas_cliente(cliente_id: int) -> pd.DataFrame:
     """
     Retorna pendências abertas de um cliente específico.
     """
     return get_pendencias(cliente_id=cliente_id, status="ABERTA")
-
 
 def get_proximas_acoes_cliente(cliente_id: int) -> pd.DataFrame:
     """
@@ -1256,7 +1229,6 @@ def get_proximas_acoes_cliente(cliente_id: int) -> pd.DataFrame:
         return df
     finally:
         conn.close()
-
 
 def get_ultimos_eventos_cliente(cliente_id: int, limite: int = 10) -> pd.DataFrame:
     """
@@ -1333,7 +1305,6 @@ def get_ultimos_eventos_cliente(cliente_id: int, limite: int = 10) -> pd.DataFra
         return df
     finally:
         conn.close()
-
 
 def get_timeline_unificada(
     cliente_id: int,
@@ -1417,7 +1388,6 @@ def get_timeline_unificada(
         return df
     finally:
         conn.close()
-
 
 def get_contatos_conhecidos(cliente_id: int) -> pd.DataFrame:
     """

@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 def formatar_clientes_para_select(df):
     """
     Recebe um DataFrame de clientes contendo colunas:

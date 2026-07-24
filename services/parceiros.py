@@ -9,11 +9,9 @@ Nenhum SQL direto — usa exclusivamente services/comissoes_db.py
 Nenhuma regra de cálculo financeiro.
 """
 
-import sqlite3
 from typing import Optional
 
 from services.comissoes_db import get_conn, query_parceiro_por_id
-
 
 # ═══════════════════════════════════════════════════════════
 # PARCEIROS
@@ -57,7 +55,6 @@ def criar_parceiro(dados: dict) -> int:
     conn.close()
     return parceiro_id
 
-
 def atualizar_parceiro(parceiro_id: int, dados: dict):
     """
     Atualiza dados de um parceiro existente.
@@ -95,7 +92,6 @@ def atualizar_parceiro(parceiro_id: int, dados: dict):
     conn.commit()
     conn.close()
 
-
 def ativar_parceiro(parceiro_id: int):
     """Ativa um parceiro (status = 'ATIVO')."""
     conn = get_conn()
@@ -105,7 +101,6 @@ def ativar_parceiro(parceiro_id: int):
     conn.commit()
     conn.close()
 
-
 def desativar_parceiro(parceiro_id: int):
     """Desativa um parceiro (status = 'INATIVO')."""
     conn = get_conn()
@@ -114,7 +109,6 @@ def desativar_parceiro(parceiro_id: int):
                    (parceiro_id,))
     conn.commit()
     conn.close()
-
 
 def excluir_parceiro(parceiro_id: int):
     """
@@ -126,7 +120,6 @@ def excluir_parceiro(parceiro_id: int):
     cursor.execute("DELETE FROM parceiros WHERE id = ?", (parceiro_id,))
     conn.commit()
     conn.close()
-
 
 # ═══════════════════════════════════════════════════════════
 # CARTEIRA DE CLIENTES
@@ -151,7 +144,6 @@ def adicionar_cliente_carteira(parceiro_id: int, cliente_id: int) -> bool:
         conn.close()
         return False
 
-
 def remover_cliente_carteira(parceiro_id: int, cliente_id: int):
     """Remove um cliente da carteira do parceiro."""
     conn = get_conn()
@@ -162,7 +154,6 @@ def remover_cliente_carteira(parceiro_id: int, cliente_id: int):
     """, (parceiro_id, cliente_id))
     conn.commit()
     conn.close()
-
 
 def substituir_carteira(parceiro_id: int, novos_cliente_ids: list):
     """
@@ -182,7 +173,6 @@ def substituir_carteira(parceiro_id: int, novos_cliente_ids: list):
             pass
     conn.commit()
     conn.close()
-
 
 def obter_ids_carteira(parceiro_id: int) -> list:
     """Retorna lista de cliente_ids da carteira de um parceiro."""

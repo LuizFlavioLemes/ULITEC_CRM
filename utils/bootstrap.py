@@ -2,13 +2,15 @@
 BOOTSTRAP ÚNICO & IDEMPOTENTE — ULITEC CRM
 ===========================================
 Executado ANTES de qualquer página carregar.
-Ordem: .env → caminhos absolutos → WAL → schema → monkey-patch sqlite3.connect
+Ordem: .env → caminhos absolutos → WAL → schema → monkey-patch .connect
 """
 
 import os
 import sys
 import sqlite3
 from pathlib import Path
+
+from database import db
 
 # ── 1. Determinar diretório raiz (funciona Windows + Linux/cPanel) ──
 _BOOTSTRAP_FILE = Path(__file__).resolve()
@@ -23,11 +25,14 @@ try:
 except ImportError:
     pass  # dotenv não instalado — sem crash
 
-# ── 3. Caminho absoluto do banco ──
+# ── 3. Caminho absoluto do banco (compatível com monkey-patch legado) ──
 DB_ABSOLUTE_PATH = str(ROOT_DIR / "crm.db")
 
 # ═══════════════════════════════════════════════════════════
-# 4. MONKEY-PATCH sqlite3.connect (interceptação global)
+# 4. MONKEY-PATCH .connect (interceptação global)
+#    Mantido para compatibilidade com código legado que ainda
+#    chama get_connection() diretamente (pages/, debug/, scripts/).
+#    NOVO CÓDIGO deve usar database.db.get_connection() em vez disso.
 # ═══════════════════════════════════════════════════════════
 _original_connect = sqlite3.connect
 
@@ -272,7 +277,7 @@ def _init_database():
         cols = [r[1] for r in cur.execute("PRAGMA table_info(interacoes)").fetchall()]
         if 'status' in cols and 'status_interacao' not in cols:
             cur.execute("ALTER TABLE interacoes RENAME COLUMN status TO status_interacao")
-    except sqlite3.OperationalError:
+    except Exception:
         pass
 
     # ── Migrar pendencias → pendencias_comerciais ──
@@ -284,7 +289,7 @@ def _init_database():
                 SELECT cliente_id, interacao_id, descricao, prioridade, responsavel, data_limite, status, criado_em
                 FROM pendencias""")
         cur.execute("DROP TABLE IF EXISTS pendencias")
-    except sqlite3.OperationalError:
+    except Exception:
         pass
 
     # ── Seeds: unidades ──
@@ -337,7 +342,7 @@ def _init_database():
 def _add_col(cur, table, column, col_def):
     try:
         cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_def}")
-    except sqlite3.OperationalError:
+    except Exception:
         pass
 
 # ── Executar inicialização do banco ──

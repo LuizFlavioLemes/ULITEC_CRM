@@ -1,4 +1,3 @@
-import sqlite3
 from datetime import datetime
 from functools import wraps
 
@@ -6,11 +5,10 @@ import bcrypt
 import streamlit as st
 
 from config import DB_PATH, MASTER_PASSWORD
-
+from database import get_connection
 
 def get_conn():
-    return sqlite3.connect(str(DB_PATH))
-
+    return get_connection()
 
 def init_auth():
     """Inicializa o sistema de autenticação: adiciona colunas necessárias e cria usuário MASTER."""
@@ -149,7 +147,6 @@ def init_auth():
 
     conn.close()
 
-
 def verificar_login(login: str, senha: str) -> dict | None:
     """
     Verifica credenciais usando bcrypt.
@@ -212,7 +209,6 @@ def verificar_login(login: str, senha: str) -> dict | None:
         "unidade_nome": unidade_nome,
     }
 
-
 def fazer_login(user: dict):
     """Armazena dados do usuário na session_state."""
     st.session_state["usuario_logado"] = True
@@ -223,7 +219,6 @@ def fazer_login(user: dict):
     st.session_state["unidade_usuario"] = user["unidade_nome"] or "ULITEC SP"
     if user["unidade_nome"]:
         st.session_state["unidade_ativa"] = user["unidade_nome"]
-
 
 def logout():
     """Limpa a sessão e retorna ao login."""
@@ -238,7 +233,6 @@ def logout():
         if key in st.session_state:
             del st.session_state[key]
     st.rerun()
-
 
 def verificar_acesso(
     requer_login: bool = True, perfis: list[str] | None = None
@@ -261,7 +255,6 @@ def verificar_acesso(
             )
             st.stop()
 
-
 def requer_login(funcao):
     """Decorator: exige autenticação."""
 
@@ -275,7 +268,6 @@ def requer_login(funcao):
         return funcao(*args, **kwargs)
 
     return wrapper
-
 
 def requer_perfil(*perfis_autorizados):
     """
@@ -299,7 +291,6 @@ def requer_perfil(*perfis_autorizados):
         return wrapper
 
     return decorator
-
 
 def mostrar_login():
     """Renderiza o formulário de login."""
@@ -337,7 +328,6 @@ def mostrar_login():
             st.rerun()
         else:
             st.error("Usuário ou senha inválidos.")
-
 
 def sidebar_usuario():
     """Exibe informações do usuário logado e botão de logout na sidebar."""

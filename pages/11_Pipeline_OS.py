@@ -1,4 +1,4 @@
-import sqlite3
+
 from datetime import date, timedelta
 
 import pandas as pd
@@ -7,6 +7,8 @@ import streamlit as st
 from auth import sidebar_usuario
 from permissions import verificar_acesso_pagina, pode_selecionar_unidade
 from services.relacionamento import get_config
+
+from database import get_connection
 
 # ── Proteção: autenticado (todos os perfis) ──
 verificar_acesso_pagina()
@@ -52,7 +54,7 @@ STATUS_OS = [
     "CANCELADA"
 ]
 
-conn = sqlite3.connect(DB)
+conn = get_connection()
 
 query_base = """
     SELECT
@@ -271,7 +273,6 @@ with tab1:
         width="stretch",
         height=600
     )
-
 
 with tab2:
 
@@ -938,7 +939,7 @@ with tab4:
                     if not historico_contato.strip():
                         st.error("Por favor, preencha o histórico do contato antes de registrar.")
                     else:
-                        conn2 = sqlite3.connect(DB)
+                        conn2 = get_connection()
                         hoje_str_dmy = date.today().strftime("%d/%m/%Y")
 
                         row = conn2.execute(
@@ -1034,7 +1035,6 @@ def _aplicar_regras_status_massa(conn, novo_status, ids=None, unidade=None):
 
     conn.execute(sql, params)
     conn.commit()
-
 
 # =====================================================
 # ABA 5 — AÇÕES EM MASSA

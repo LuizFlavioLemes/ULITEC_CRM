@@ -13,10 +13,12 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 import plotly.express as px
-import sqlite3
+
 import streamlit as st
 
 from auth import verificar_acesso, sidebar_usuario
+
+from database import get_connection
 
 # ── Proteção ──
 verificar_acesso()
@@ -31,8 +33,7 @@ st.title("🔧 Gestão de Terceiros")
 # ============================================================
 
 def get_conn():
-    return sqlite3.connect("crm.db")
-
+    return get_connection()
 
 # ── Migração automática ──
 def migrar_banco():
@@ -68,7 +69,6 @@ def migrar_os_antigas():
 
 migrar_os_antigas()
 
-
 # ── Helpers ──
 def carregar_fornecedores_ativos():
     conn = get_conn()
@@ -99,7 +99,6 @@ def carregar_servicos_ativos():
 
 STATUS_OPCOES = ["ENVIADO", "ORÇADO", "APROVADO", "RECEBIDO", "CANCELADO"]
 
-
 # ── Integração Pipeline ──
 def buscar_os_por_termo(termo):
     if not termo or len(termo.strip()) < 1:
@@ -128,7 +127,6 @@ def formatar_os_display(row):
     e = f" | {row['equipamento']}" if row.get("equipamento") else ""
     return f"OS {row['numero_os']} | {c}{e}"
 
-
 # ── Preenchimento automático de datas conforme status ──
 def auto_preencher_datas():
     status_novo = st.session_state.get("status_serv", "ENVIADO")
@@ -141,7 +139,6 @@ def auto_preencher_datas():
     col_data = mapa.get(status_novo)
     if col_data and not st.session_state.get(f"{col_data}_serv"):
         st.session_state[f"{col_data}_serv"] = hoje
-
 
 # ============================================================
 # ABA 1
@@ -170,7 +167,7 @@ def aba_servicos_terceirizados():
         # ── Carregar dados na edição ──
         if editando and "edit_data_loaded" not in st.session_state:
             conn = get_conn()
-            conn.row_factory = sqlite3.Row
+            conn.row_factory = dict
             row = conn.execute("SELECT * FROM terceiros_servicos WHERE id = ?", (st.session_state.edit_servico_id,)).fetchone()
             conn.close()
             if row:
@@ -289,7 +286,6 @@ def aba_servicos_terceirizados():
     # ── Tabela ──
     _exibir_tabela_servicos()
 
-
 def _executar_salvar_servico(fornecedor_id, marca_id, servico_id, modelo, descricao, valor, status, data_envio, data_retorno, observacoes, editando, data_orcamento=None, data_aprovacao=None, data_recebimento=None):
     if not modelo.strip():
         st.error("O campo Modelo é obrigatório.")
@@ -327,7 +323,6 @@ def _executar_salvar_servico(fornecedor_id, marca_id, servico_id, modelo, descri
         st.error(f"Erro ao salvar: {e}")
     finally:
         conn.close()
-
 
 def _exibir_tabela_servicos():
     st.markdown("### 📄 Serviços Cadastrados")
@@ -423,7 +418,6 @@ def _exibir_tabela_servicos():
 
     st.caption(f"Total: {len(dff)}")
 
-
 # ============================================================
 # ABA 2 — CADASTROS GERAIS
 # ============================================================
@@ -461,7 +455,6 @@ def cadastro_fornecedores():
                     cx.commit(); cx.close()
     else: st.info("Nenhum fornecedor.")
 
-
 def cadastro_servicos():
     st.markdown("#### 🔧 Tipos de Serviço")
     conn = get_conn()
@@ -493,7 +486,6 @@ def cadastro_servicos():
                     cx.commit(); cx.close()
     else: st.info("Nenhum tipo de serviço.")
 
-
 def cadastro_marcas():
     st.markdown("#### 🏷️ Marcas")
     conn = get_conn()
@@ -524,14 +516,12 @@ def cadastro_marcas():
                     cx.commit(); cx.close()
     else: st.info("Nenhuma marca.")
 
-
 def aba_cadastros_gerais():
     st.markdown("### ⚙️ Cadastros Gerais")
     t1, t2, t3 = st.tabs(["Fornecedores", "Serviços", "Marcas"])
     with t1: cadastro_fornecedores()
     with t2: cadastro_servicos()
     with t3: cadastro_marcas()
-
 
 # ============================================================
 # ABA 3 — INDICADORES
@@ -620,7 +610,6 @@ def aba_indicadores():
                 st.dataframe(df_recebido.pivot_table(index="fornecedor", columns=["servico"], values="valor", aggfunc=ag, fill_value=0))
         else:
             st.info("Nenhum recebido para exibir.")
-
 
 # ============================================================
 # RENDERIZAÇÃO

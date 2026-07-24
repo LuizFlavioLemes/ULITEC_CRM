@@ -1,4 +1,4 @@
-import utils.bootstrap  # noqa: F401 — bootstrap único: .env, WAL, schema, monkey-patch sqlite3.connect
+import utils.bootstrap  # noqa: F401 — bootstrap único: .env, WAL, schema, monkey-patch .connect
 
 import streamlit as st
 

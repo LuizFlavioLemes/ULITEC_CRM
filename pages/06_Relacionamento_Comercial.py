@@ -25,11 +25,11 @@ from datetime import datetime, date, timedelta
 
 import streamlit as st
 import pandas as pd
-import sqlite3
 
 from auth import sidebar_usuario
 from permissions import verificar_acesso_pagina, tem_acesso
 from services import formatar_clientes_para_select
+from database import get_connection
 from services.relacionamento import (
     TIPOS_INTERACAO,
     ASSUNTOS_PADRAO,
@@ -84,7 +84,7 @@ if "usuario_id" not in st.session_state:
     st.session_state["usuario_id"] = None
 
 # ── Conexão para dados auxiliares ──
-conn = sqlite3.connect("crm.db")
+conn = get_connection()
 
 # Carregar lista de clientes para selects
 df_clientes = pd.read_sql_query(

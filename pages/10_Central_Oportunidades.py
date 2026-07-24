@@ -2,7 +2,6 @@ from datetime import datetime, date, timedelta
 
 import streamlit as st
 import pandas as pd
-import sqlite3
 
 from auth import sidebar_usuario
 from permissions import verificar_acesso_pagina, pode_selecionar_unidade
@@ -19,6 +18,7 @@ from services.inteligencia_comercial import (
     get_resumo_executivo,
     PENALIDADE_RELACIONAMENTO_ATIVO,
 )
+from database import get_connection
 from services.relacionamento import (
     get_alertas_relacionamento,
     get_pendencias,
@@ -58,7 +58,7 @@ else:
 # ── Determinar filtro de unidade ──
 unidade_param = None if st.session_state["unidade_ativa"] == "GRUPO" else st.session_state["unidade_ativa"]
 
-conn = sqlite3.connect("crm.db")
+conn = get_connection()
 
 # =====================================================
 # FILTROS GLOBAIS
@@ -93,7 +93,6 @@ filtro_cliente = st.sidebar.selectbox("Cliente", options=clientes_lista)
 
 conn.close()
 
-
 def aplicar_filtros(df: pd.DataFrame) -> pd.DataFrame:
     """Aplica filtros globais de estado/cidade/cliente a um DataFrame."""
     if df.empty:
@@ -106,12 +105,11 @@ def aplicar_filtros(df: pd.DataFrame) -> pd.DataFrame:
         df = df[df["cidade"] == filtro_cidade]
     return df
 
-
 # =====================================================
 # CARREGAR DADOS
 # =====================================================
 
-conn = sqlite3.connect("crm.db")
+conn = get_connection()
 
 dias_alerta = conn.execute(
     "SELECT valor FROM configuracoes WHERE chave = 'dias_alerta_preventiva'"
@@ -221,7 +219,6 @@ else:
 
 df_novos_clientes = pd.read_sql_query(query_novos_clientes, conn, params=params_novos)
 
-
 def classificar_potencial(qtd):
     if qtd >= 15:
         return "ALTO"
@@ -229,7 +226,6 @@ def classificar_potencial(qtd):
         return "MÉDIO"
     else:
         return "BAIXO"
-
 
 df_novos_clientes["potencial"] = df_novos_clientes["qtd_mitsubishi"].apply(classificar_potencial)
 
@@ -311,7 +307,7 @@ st.caption(
 )
 
 hoje_str = date.today().strftime("%Y-%m-%d")
-conn_fila = sqlite3.connect("crm.db")
+conn_fila = get_connection()
 lista_prioridades = []
 prox_acao_sugerida = {
     "PENDENCIA_VENCIDA": "Atender pendência vencida imediatamente",

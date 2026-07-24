@@ -6,20 +6,19 @@ Garante que TODAS as tabelas e colunas críticas existam no .db,
 evitando crashes em produção por schema ausente.
 """
 
-import sqlite3
 import os
-
+from database import db
 
 def garantir_schema(db_path: str):
     """Cria tabelas faltantes e adiciona colunas críticas se ausentes."""
 
-    # Se o arquivo .db não existe, sqlite3.connect já cria. Mas se o
+    # Se o arquivo .db não existe, o provider já cria. Mas se o
     # diretório não existir, criamos.
     db_dir = os.path.dirname(db_path)
     if db_dir and not os.path.exists(db_dir):
         os.makedirs(db_dir, exist_ok=True)
 
-    conn = sqlite3.connect(db_path)
+    conn = db.get_connection()
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
@@ -510,10 +509,9 @@ def garantir_schema(db_path: str):
     conn.commit()
     conn.close()
 
-
 def _add_column_if_missing(cur, table: str, column: str, col_def: str):
     """Adiciona coluna se não existir, ignorando erro silenciosamente."""
     try:
         cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_def}")
-    except sqlite3.OperationalError:
+    except Exception:
         pass  # coluna já existe

@@ -21,9 +21,10 @@ Atualização de versão:
 
 import os
 import sys
-import sqlite3
 from datetime import date
 from pathlib import Path
+
+from database import get_connection
 
 # ═══════════════════════════════════════════════════════════
 # METADADOS OFICIAIS DA VERSÃO
@@ -50,23 +51,17 @@ PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.versio
 def _detect_db_version() -> str:
     """Tenta detectar a versão do SQLite em uso."""
     try:
-        ROOT_DIR = Path(__file__).resolve().parent.parent
-        db_path = ROOT_DIR / "crm.db"
-        if db_path.exists():
-            conn = sqlite3.connect(str(db_path))
-            cursor = conn.execute("SELECT sqlite_version()")
-            ver = cursor.fetchone()[0]
-            conn.close()
-            return ver
-        return "N/A (banco não encontrado)"
+        conn = get_connection()
+        cursor = conn.execute("SELECT sqlite_version()")
+        ver = cursor.fetchone()[0]
+        return ver
     except Exception:
         return "N/A"
 
-
 def _detect_sqlite_version() -> str:
-    """Versão do módulo sqlite3 em uso."""
+    """Versão do módulo  em uso (constante do módulo, não conexão)."""
+    import sqlite3
     return sqlite3.sqlite_version
-
 
 # ═══════════════════════════════════════════════════════════
 # API PÚBLICA
@@ -76,16 +71,13 @@ def get_version_string() -> str:
     """Retorna string resumida: 'ULITEC CRM v1.0.3 (build 2025.0702.0)'."""
     return f"{SYSTEM_NAME} v{VERSION} (build {BUILD})"
 
-
 def get_version_badge() -> str:
     """Retorna string curta: 'v1.0.3'."""
     return f"v{VERSION}"
 
-
 def get_banner() -> str:
     """Retorna banner completo para uso em HTML/terminal."""
     return f"{SYSTEM_FULL_NAME} — {get_version_string()} [{AMBIENTE}]"
-
 
 def get_version_info() -> dict:
     """
@@ -105,7 +97,6 @@ def get_version_info() -> dict:
         "sqlite_banco": _detect_db_version(),
     }
 
-
 def get_version_short_info() -> dict:
     """Versão resumida para rodapé e banners."""
     return {
@@ -113,7 +104,6 @@ def get_version_short_info() -> dict:
         "versao": VERSION,
         "ambiente": AMBIENTE,
     }
-
 
 # ═══════════════════════════════════════════════════════════
 # INFRAESTRUTURA PARA RELEASES FUTURAS
@@ -126,7 +116,6 @@ def get_version_tuple() -> tuple:
     Útil para migrações condicionais e scripts de upgrade.
     """
     return tuple(int(x) for x in VERSION.split("."))
-
 
 def check_minimum_version(min_version: str) -> bool:
     """
@@ -141,7 +130,6 @@ def check_minimum_version(min_version: str) -> bool:
     actual = get_version_tuple()
     required = tuple(int(x) for x in min_version.split("."))
     return actual >= required
-
 
 # ═══════════════════════════════════════════════════════════
 # AUTO-VALIDAÇÃO

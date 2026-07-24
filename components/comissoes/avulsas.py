@@ -20,7 +20,6 @@ TRANSICOES = {
     "AGUARDANDO_COMPENSACAO": "PAGO",
 }
 
-
 def render():
     """Renderiza a aba de Comissoes Avulsas."""
     hoje = date.today()

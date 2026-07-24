@@ -81,7 +81,6 @@ def badge_status(status: str, tamanho: str = "pequeno") -> str:
     ">{status}</span>
     """
 
-
 # ═══════════════════════════════════════════════════════════
 # ETAPA 2 — HEADERS
 # ═══════════════════════════════════════════════════════════
@@ -102,11 +101,9 @@ def titulo_pagina(icone: str, titulo: str, descricao: str = ""):
     if descricao:
         st.markdown(descricao)
 
-
 def subtitulo(texto: str):
     """Subtítulo padronizado com `st.subheader`."""
     st.subheader(texto)
-
 
 def cabecalho_modulo(icone: str, titulo: str, descricao: str = ""):
     """
@@ -126,7 +123,6 @@ def cabecalho_modulo(icone: str, titulo: str, descricao: str = ""):
         st.markdown(descricao)
     st.divider()
 
-
 def secao_divisoria(texto: str = ""):
     """
     Divisor visual entre seções, com texto opcional.
@@ -137,7 +133,6 @@ def secao_divisoria(texto: str = ""):
     if texto:
         st.markdown(f"### {texto}")
     st.divider()
-
 
 # ═══════════════════════════════════════════════════════════
 # ETAPA 4 — KPIs
@@ -174,7 +169,6 @@ def card_indicador(
         help=help_text,
     )
 
-
 def linha_indicadores(indicadores: list, cols: int = 4):
     """
     Linha completa de KPIs padronizados.
@@ -204,7 +198,6 @@ def linha_indicadores(indicadores: list, cols: int = 4):
                 help_text=indicador.get("help"),
                 icone=indicador.get("icone", ""),
             )
-
 
 # ═══════════════════════════════════════════════════════════
 # ETAPA 5 — FILTROS
@@ -247,7 +240,6 @@ def filtro_unidade_sidebar():
 
     return st.session_state["unidade_ativa"]
 
-
 def filtro_periodo_sidebar(
     chave: str = "filtro_periodo",
     label: str = "📅 Período",
@@ -285,7 +277,6 @@ def filtro_periodo_sidebar(
         index=opcoes.index(default) if default in opcoes else 0,
         key=chave,
     )
-
 
 def linha_filtros(filtros: list):
     """
@@ -378,7 +369,6 @@ def linha_filtros(filtros: list):
 
     return resultados
 
-
 # ═══════════════════════════════════════════════════════════
 # ETAPA 6 — FORMULÁRIOS (helpers)
 # ═══════════════════════════════════════════════════════════
@@ -396,7 +386,6 @@ def campo_obrigatorio(rotulo: str, placeholder: str = "", chave: str = None):
         key=chave,
     )
 
-
 def campo_opcional(rotulo: str, placeholder: str = "", chave: str = None):
     """
     Campo de texto opcional.
@@ -410,14 +399,12 @@ def campo_opcional(rotulo: str, placeholder: str = "", chave: str = None):
         key=chave,
     )
 
-
 def campo_data(rotulo: str, valor_padrao=None, chave: str = None):
     """Campo de data padronizado."""
     import datetime
     if valor_padrao is None:
         valor_padrao = datetime.date.today()
     return st.date_input(rotulo, value=valor_padrao, key=chave)
-
 
 def campo_valor(rotulo: str, valor_padrao: float = 0.0, chave: str = None):
     """Campo de valor monetário padronizado."""
@@ -430,11 +417,9 @@ def campo_valor(rotulo: str, valor_padrao: float = 0.0, chave: str = None):
         key=chave,
     )
 
-
 def campo_observacao(rotulo: str = "📝 Observações", altura: int = 100, chave: str = None):
     """Campo de observações/texto livre padronizado."""
     return st.text_area(rotulo, height=altura, key=chave)
-
 
 def botoes_form(salvar: bool = True, cancelar: bool = True, excluir: bool = False):
     """
@@ -469,13 +454,11 @@ def botoes_form(salvar: bool = True, cancelar: bool = True, excluir: bool = Fals
         botoes.get("🗑 Excluir", False),
     )
 
-
 # ═══════════════════════════════════════════════════════════
 # ETAPA 7 — TABELAS
 # ═══════════════════════════════════════════════════════════
 
 import pandas as pd
-
 
 def tabela_padrao(
     dados: pd.DataFrame,
@@ -509,7 +492,6 @@ def tabela_padrao(
         kwargs["column_config"] = coluna_config
 
     st.dataframe(dados, **kwargs)
-
 
 def aplicar_estilo_tabela(
     df: pd.DataFrame,
@@ -548,7 +530,6 @@ def aplicar_estilo_tabela(
 
     return df.style.apply(colorir_linha, axis=1)
 
-
 # ═══════════════════════════════════════════════════════════
 # ETAPA 2 — MENSAGENS
 # ═══════════════════════════════════════════════════════════
@@ -557,21 +538,17 @@ def mensagem_sucesso(texto: str):
     """Mensagem de sucesso padronizada."""
     st.success(texto)
 
-
 def mensagem_erro(texto: str):
     """Mensagem de erro padronizada."""
     st.error(f"❌ {texto}")
-
 
 def mensagem_atencao(texto: str):
     """Mensagem de alerta/atenção padronizada."""
     st.warning(f"⚠️ {texto}")
 
-
 def mensagem_info(texto: str):
     """Mensagem informativa padronizada."""
     st.info(texto)
-
 
 def confirmacao(texto: str, ao_confirmar, *args, **kwargs):
     """
@@ -595,7 +572,6 @@ def confirmacao(texto: str, ao_confirmar, *args, **kwargs):
             if st.button("❌ Cancelar", width="stretch"):
                 return None
 
-
 def container_resultado(titulo: str = "", expandido: bool = True):
     """
     Container padronizado para resultados/expansão de conteúdo.
@@ -614,7 +590,6 @@ def container_resultado(titulo: str = "", expandido: bool = True):
     if titulo:
         return st.expander(titulo, expanded=expandido)
     return st.container(border=True)
-
 
 # ═══════════════════════════════════════════════════════════
 # ETAPA 8 — BUSCA INTELIGENTE
@@ -660,7 +635,6 @@ def caixa_busca(
         value=valor_padrao,
     )
 
-
 # ═══════════════════════════════════════════════════════════
 # ETAPA 9 — GRÁFICOS
 # ═══════════════════════════════════════════════════════════
@@ -692,7 +666,6 @@ def config_grafico(
     if titulo:
         layout["title"] = titulo
     return layout
-
 
 def grafico_barras(
     dados: pd.DataFrame,
@@ -750,7 +723,6 @@ def grafico_barras(
     st.plotly_chart(fig, width="stretch")
     return fig
 
-
 # ═══════════════════════════════════════════════════════════
 # HELPERS ADICIONAIS
 # ═══════════════════════════════════════════════════════════
@@ -760,11 +732,9 @@ def espacamento(altura: int = 1):
     for _ in range(altura):
         st.markdown("")
 
-
 def linha_separadora():
     """Linha separadora padronizada (`st.divider()`)."""
     st.divider()
-
 
 # ═══════════════════════════════════════════════════════════
 # RODAPÉ PADRONIZADO

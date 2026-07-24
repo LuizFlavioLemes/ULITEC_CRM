@@ -35,7 +35,6 @@ MODELOS_API = {
 # Modelos gratuitos disponíveis (para fallback automático)
 MODELOS_GRATUITOS = ["gemini-2.0-flash", "gemini-1.5-flash"]
 
-
 def _extrair_tempo_espera(erro: str) -> float:
     """
     Tenta extrair o tempo de espera recomendado do erro 429.
@@ -46,7 +45,6 @@ def _extrair_tempo_espera(erro: str) -> float:
     if match:
         return float(match.group(1))
     return 0.0
-
 
 def _eh_erro_quota(erro: str) -> bool:
     """Verifica se o erro é relacionado a cota/limite (429)."""
@@ -64,7 +62,6 @@ def _eh_erro_quota(erro: str) -> bool:
             "limit: 0",
         ]
     )
-
 
 def testar_conexao(api_key: str) -> tuple:
     """
@@ -99,7 +96,6 @@ def testar_conexao(api_key: str) -> tuple:
                 "~1500 req/dia. Se excedeu, aguarde 24h."
             )
         return False, f"❌ Falha na conexão Gemini: {erro}"
-
 
 def gerar_relatorio(
     api_key: str,

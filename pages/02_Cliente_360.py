@@ -2,7 +2,6 @@ from datetime import datetime, date
 
 import streamlit as st
 import pandas as pd
-import sqlite3
 
 from auth import sidebar_usuario
 from permissions import verificar_acesso_pagina
@@ -22,6 +21,7 @@ from services.ia.prompt_builder import (
     montar_contexto_cliente,
     montar_prompt_completo,
 )
+from database import get_connection
 from services.relacionamento import (
     get_indicadores_relacionamento,
     get_historico_interacoes,
@@ -44,7 +44,7 @@ sidebar_usuario()
 
 st.title("🎯 Cliente 360°")
 
-conn = sqlite3.connect("crm.db")
+conn = get_connection()
 
 clientes = pd.read_sql_query(
     """
@@ -297,7 +297,7 @@ with tabs[1]:
 
                     # Pendências relacionadas
                     st.markdown("**📌 Pendências Relacionadas**")
-                    conn_local = sqlite3.connect("crm.db")
+                    conn_local = get_connection()
                     try:
                         df_pend_rel = pd.read_sql_query(
                             """
@@ -649,7 +649,7 @@ with tabs[6]:
     # ── Bloco 3: Oportunidades com Follow-up Pendente ──
     st.markdown("### 📅 Oportunidades com Follow-up Pendente")
     try:
-        conn_local = sqlite3.connect("crm.db")
+        conn_local = get_connection()
         df_opp_followup = pd.read_sql_query(
             """
             SELECT os.proximo_followup AS data_followup,

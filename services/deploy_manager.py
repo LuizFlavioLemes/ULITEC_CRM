@@ -22,12 +22,13 @@ Regras:
 """
 
 import os
-import sqlite3
+
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from database import get_connection
 from config import (
     ROOT_DIR,
     DB_PATH,
@@ -47,7 +48,6 @@ from config import (
 # DATACLASS
 # ============================================================
 
-
 @dataclass
 class HealthResult:
     """Resultado completo do health check do sistema."""
@@ -62,11 +62,9 @@ class HealthResult:
     version: str = ""
     timestamp: str = ""
 
-
 # ============================================================
 # 1) ESTRUTURA DE PASTAS
 # ============================================================
-
 
 def get_project_structure() -> Dict[str, Path]:
     """
@@ -96,11 +94,9 @@ def get_project_structure() -> Dict[str, Path]:
         "tests": ROOT_DIR / "tests",
     }
 
-
 # ============================================================
 # 2) CRIAÇÃO DE PASTAS
 # ============================================================
-
 
 def ensure_directories() -> Dict[str, bool]:
     """
@@ -123,11 +119,9 @@ def ensure_directories() -> Dict[str, bool]:
 
     return resultado
 
-
 # ============================================================
 # 3) VALIDAÇÃO DE AMBIENTE (.env)
 # ============================================================
-
 
 def validate_env() -> Dict:
     """
@@ -206,11 +200,9 @@ def validate_env() -> Dict:
         "status": status,
     }
 
-
 # ============================================================
 # 4) VALIDAÇÃO DE BANCO DE DADOS
 # ============================================================
-
 
 def validate_database() -> Dict:
     """
@@ -251,7 +243,7 @@ def validate_database() -> Dict:
     tamanho_kb = DB_PATH.stat().st_size / 1024.0
 
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         cursor = conn.cursor()
 
         # Integrity check
@@ -310,11 +302,9 @@ def validate_database() -> Dict:
         "status": status,
     }
 
-
 # ============================================================
 # 5) VALIDAÇÃO DE ARQUIVOS ESSENCIAIS
 # ============================================================
-
 
 def validate_requirements() -> Dict:
     """
@@ -371,11 +361,9 @@ def validate_requirements() -> Dict:
         "status": status,
     }
 
-
 # ============================================================
 # 6) SYSTEM HEALTH (completo)
 # ============================================================
-
 
 def system_health() -> HealthResult:
     """
@@ -445,11 +433,9 @@ def system_health() -> HealthResult:
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     )
 
-
 # ============================================================
 # 7) DETECÇÃO DE PRIMEIRA INSTALAÇÃO
 # ============================================================
-
 
 def is_first_install() -> bool:
     """
@@ -466,7 +452,7 @@ def is_first_install() -> bool:
         return True
 
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table';"
@@ -477,11 +463,9 @@ def is_first_install() -> bool:
     except Exception:
         return True
 
-
 # ============================================================
 # 8) RELATÓRIO DE INSTALAÇÃO
 # ============================================================
-
 
 def installation_report() -> str:
     """
@@ -595,11 +579,9 @@ def installation_report() -> str:
 
     return "\n".join(linhas)
 
-
 # ============================================================
 # ETAPA 3 — PREPARAÇÃO PARA MIGRAÇÕES FUTURAS
 # ============================================================
-
 
 def apply_pending_migrations() -> Dict:
     """
@@ -637,7 +619,6 @@ def apply_pending_migrations() -> Dict:
         "motivo": "Nenhuma migração pendente (infraestrutura preparada para uso futuro)",
         "versoes_verificadas": [],
     }
-
 
 # ═══════════════════════════════════════════════════════════
 # AUTO-TESTE

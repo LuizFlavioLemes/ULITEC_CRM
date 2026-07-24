@@ -15,7 +15,7 @@ import hashlib
 import json
 import os
 import shutil
-import sqlite3
+
 import tempfile
 import time as time_module
 import zipfile
@@ -29,6 +29,8 @@ from typing import Optional, Tuple
 
 from config import DB_PATH
 from services.version import VERSION as CRM_VERSION, BUILD
+
+from database import get_connection
 
 BACKUP_DIR = Path("backups")
 EXPORT_DIR = Path("backups/export")
@@ -161,14 +163,13 @@ MODULOS_LIMPEZA = {
     },
 }
 
-
 # ============================================================
 # FUNÇÕES DE AUDITORIA / STATUS
 # ============================================================
 
 def obter_status_sistema() -> dict:
     """Retorna indicadores completos do sistema."""
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -185,7 +186,7 @@ def obter_status_sistema() -> dict:
             qtd = cursor.fetchone()[0]
             info_tabelas[nome] = qtd
             total_registros += qtd
-        except sqlite3.OperationalError:
+        except Exception:
             pass
 
     # Versão do banco (da tabela configuracoes)
@@ -257,7 +258,6 @@ def obter_status_sistema() -> dict:
         "info_tabelas": info_tabelas,
     }
 
-
 # ============================================================
 # BLOCO 2 - BACKUP
 # ============================================================
@@ -303,7 +303,7 @@ def gerar_backup_completo() -> dict:
         json.dump(manifesto, f, indent=2, ensure_ascii=False)
 
     # Registrar no banco
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = get_connection()
     conn.execute(
         """INSERT INTO configuracoes (chave, valor, descricao)
            VALUES (?, ?, ?)
@@ -325,7 +325,6 @@ def gerar_backup_completo() -> dict:
         "registros": status["total_registros"],
         "crm_version": CRM_VERSION,
     }
-
 
 # ============================================================
 # BLOCO 3 - EXPORTAÇÃO
@@ -419,7 +418,6 @@ def exportar_backup_compactado(
         "registros": status["total_registros"],
     }
 
-
 # ============================================================
 # BLOCO 5 - RESTAURAÇÃO (LEGADO - MANTER POR COMPATIBILIDADE)
 # ============================================================
@@ -460,7 +458,6 @@ def listar_backups_disponiveis() -> list:
 
     return backups
 
-
 def validar_arquivo_restauracao(caminho_arquivo: str) -> dict:
     """
     Valida se um arquivo de backup é válido para restauração.
@@ -494,7 +491,7 @@ def validar_arquivo_restauracao(caminho_arquivo: str) -> dict:
 
         elif caminho.suffix == ".db":
             try:
-                conn = sqlite3.connect(str(caminho))
+                conn = get_connection()
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT name FROM sqlite_master WHERE type='table'"
@@ -519,7 +516,6 @@ def validar_arquivo_restauracao(caminho_arquivo: str) -> dict:
     except Exception as e:
         return {"valido": False, "erro": str(e)}
 
-
 # ============================================================
 # BLOCO 6 - MANUTENÇÃO
 # ============================================================
@@ -527,7 +523,7 @@ def validar_arquivo_restauracao(caminho_arquivo: str) -> dict:
 def executar_vacuum() -> dict:
     """Executa VACUUM no banco para recuperar espaço."""
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         antes = DB_PATH.stat().st_size
         conn.execute("VACUUM")
         conn.close()
@@ -541,35 +537,32 @@ def executar_vacuum() -> dict:
     except Exception as e:
         return {"sucesso": False, "erro": str(e)}
 
-
 def executar_reindex() -> dict:
     """Recria índices do banco."""
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         conn.execute("REINDEX")
         conn.close()
         return {"sucesso": True, "mensagem": "Índices recriados com sucesso"}
     except Exception as e:
         return {"sucesso": False, "erro": str(e)}
 
-
 def limpar_cache() -> dict:
     """Limpa cache interno do SQLite."""
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         conn.execute("PRAGMA shrink_memory")
         conn.close()
         return {"sucesso": True, "mensagem": "Cache limpo com sucesso"}
     except Exception as e:
         return {"sucesso": False, "erro": str(e)}
 
-
 def limpar_logs_antigos(dias: int = 90) -> dict:
     """Remove logs de relatórios IA antigos."""
     try:
         limite = (datetime.now() - timedelta(days=dias)).strftime("%Y-%m-%d")
 
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
             "DELETE FROM relatorios_ia WHERE criado_em < ?", (limite,)
@@ -585,11 +578,10 @@ def limpar_logs_antigos(dias: int = 90) -> dict:
     except Exception as e:
         return {"sucesso": False, "erro": str(e)}
 
-
 def recalcular_estatisticas() -> dict:
     """Recalcula estatísticas do SQLite para otimização de queries."""
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
             "SELECT name FROM sqlite_master WHERE type='table'"
@@ -600,7 +592,7 @@ def recalcular_estatisticas() -> dict:
         for nome in tabelas:
             try:
                 cursor.execute(f'ANALYZE "{nome}"')
-            except sqlite3.OperationalError:
+            except Exception:
                 pass
 
         conn.close()
@@ -612,11 +604,10 @@ def recalcular_estatisticas() -> dict:
     except Exception as e:
         return {"sucesso": False, "erro": str(e)}
 
-
 def registrar_manutencao() -> None:
     """Registra data/hora da última manutenção no banco."""
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         conn.execute(
             """INSERT INTO configuracoes (chave, valor, descricao)
                VALUES ('ultima_manutencao', ?, 'Última manutenção')
@@ -628,7 +619,6 @@ def registrar_manutencao() -> None:
     except Exception:
         pass
 
-
 # ============================================================
 # BLOCO 7 - RESET CONTROLADO
 # ============================================================
@@ -637,7 +627,7 @@ def preparar_lista_reset() -> list:
     """
     Retorna a lista completa do que será apagado no reset.
     """
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = get_connection()
     cursor = conn.cursor()
 
     itens = []
@@ -645,7 +635,7 @@ def preparar_lista_reset() -> list:
         try:
             cursor.execute(f'SELECT COUNT(*) FROM "{tabela}"')
             qtd = cursor.fetchone()[0]
-        except sqlite3.OperationalError:
+        except Exception:
             qtd = 0
 
         nome_legivel = {
@@ -687,7 +677,6 @@ def preparar_lista_reset() -> list:
 
     return itens
 
-
 def executar_reset_sistema() -> dict:
     """
     Executa o reset completo do sistema.
@@ -696,7 +685,7 @@ def executar_reset_sistema() -> dict:
     - Unidades
     - Configurações
     """
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = get_connection()
     cursor = conn.cursor()
 
     resultados = []
@@ -717,14 +706,14 @@ def executar_reset_sistema() -> dict:
                     (tabela,),
                 )
                 conn.commit()
-            except sqlite3.OperationalError:
+            except Exception:
                 pass
 
             resultados.append({
                 "tabela": tabela,
                 "removidos": antes,
             })
-        except sqlite3.OperationalError as e:
+        except Exception as e:
             resultados.append({
                 "tabela": tabela,
                 "removidos": 0,
@@ -781,20 +770,17 @@ def executar_reset_sistema() -> dict:
         "data_reset": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
-
 # ============================================================
 # BLOCO 8 - LIMPEZA SELETIVA POR MÓDULO
 # ============================================================
 # Toda a lógica reside aqui. A interface apenas chama estas funções.
 # Para adicionar um novo módulo, edite o dicionário MODULOS_LIMPEZA.
 
-
 # ── Utilitário de conexão ──
 
 def _obter_conn():
     """Retorna conexão com o banco SQLite."""
-    return sqlite3.connect(str(DB_PATH))
-
+    return get_connection()
 
 # ── Contagem de registros (segura) ──
 
@@ -803,9 +789,8 @@ def _contar_registros(cursor, tabela: str) -> int:
     try:
         cursor.execute(f'SELECT COUNT(*) FROM "{tabela}"')
         return cursor.fetchone()[0]
-    except sqlite3.OperationalError:
+    except Exception:
         return 0
-
 
 # ── Obter lista de módulos disponíveis ──
 
@@ -814,7 +799,6 @@ def obter_modulos_limpeza() -> list:
     Retorna a lista de nomes dos módulos disponíveis para limpeza.
     """
     return list(MODULOS_LIMPEZA.keys())
-
 
 # ── Status do módulo (quantidade de registros) ──
 
@@ -854,7 +838,6 @@ def obter_status_modulo(nome_modulo: str) -> dict:
         "total_registros": total_registros,
     }
 
-
 # ── Status de todos os módulos (para exibição inicial) ──
 
 def obter_status_todos_modulos() -> list:
@@ -865,7 +848,6 @@ def obter_status_todos_modulos() -> list:
     for nome_modulo in MODULOS_LIMPEZA:
         resultados.append(obter_status_modulo(nome_modulo))
     return resultados
-
 
 # ── Dependências entre módulos (Visualizar Dependências) ──
 
@@ -939,7 +921,6 @@ def obter_dependencias_modulo(nome_modulo: str) -> dict:
         "grafo": grafo,
     }
 
-
 # ── Pré-visualização da limpeza ──
 
 def preparar_limpeza_modulo(nome_modulo: str) -> dict:
@@ -949,7 +930,6 @@ def preparar_limpeza_modulo(nome_modulo: str) -> dict:
     Útil para exibir antes da confirmação.
     """
     return obter_status_modulo(nome_modulo)
-
 
 # ── Executar limpeza seletiva ──
 
@@ -1001,7 +981,7 @@ def executar_limpeza_modulo(
                             (tabela,),
                         )
                         conn.commit()
-                    except sqlite3.OperationalError:
+                    except Exception:
                         pass
 
                 resultados.append({
@@ -1016,7 +996,7 @@ def executar_limpeza_modulo(
                     "status": "vazia",
                 })
 
-        except sqlite3.OperationalError as e:
+        except Exception as e:
             erros.append({
                 "tabela": tabela,
                 "erro": str(e),
@@ -1044,7 +1024,6 @@ def executar_limpeza_modulo(
         "data_limpeza": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
-
 # ============================================================
 # BLOCO 9 - RESTAURAÇÃO COMPLETA DO SISTEMA (v2.4.2)
 # ============================================================
@@ -1052,7 +1031,6 @@ def executar_limpeza_modulo(
 # Nenhuma SQL na interface.
 
 LOG_FILE = Path("logs/restauracoes.log")
-
 
 def _registrar_log_restauracao(entrada: dict) -> None:
     """
@@ -1064,7 +1042,6 @@ def _registrar_log_restauracao(entrada: dict) -> None:
             f.write(json.dumps(entrada, ensure_ascii=False) + "\n")
     except Exception:
         pass
-
 
 def listar_backups() -> list:
     """
@@ -1113,7 +1090,6 @@ def listar_backups() -> list:
 
     return backups
 
-
 def obter_informacoes_backup(caminho: str) -> dict:
     """
     Obtém informações detalhadas de um arquivo de backup.
@@ -1161,7 +1137,7 @@ def obter_informacoes_backup(caminho: str) -> dict:
         elif caminho_p.suffix == ".db":
             info["tipo"] = "SQLite Direto (.db)"
             try:
-                conn = sqlite3.connect(str(caminho_p))
+                conn = get_connection()
                 cursor = conn.cursor()
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 tabelas = [row[0] for row in cursor.fetchall() if row[0] != "sqlite_sequence"]
@@ -1174,7 +1150,7 @@ def obter_informacoes_backup(caminho: str) -> dict:
                     try:
                         cursor.execute(f'SELECT COUNT(*) FROM "{t}"')
                         total_reg += cursor.fetchone()[0]
-                    except sqlite3.OperationalError:
+                    except Exception:
                         pass
                 info["quantidade_registros"] = total_reg
 
@@ -1192,7 +1168,6 @@ def obter_informacoes_backup(caminho: str) -> dict:
 
     except Exception as e:
         return {"erro": f"Erro ao ler informações: {str(e)}"}
-
 
 def validar_backup(caminho: str) -> dict:
     """
@@ -1286,7 +1261,6 @@ def validar_backup(caminho: str) -> dict:
         return _validar_backup_zip(caminho_p, resultado)
     else:
         return _validar_backup_db(caminho_p, resultado)
-
 
 def _validar_backup_zip(caminho_p: Path, resultado: dict) -> dict:
     """Valida backup no formato .zip."""
@@ -1403,7 +1377,6 @@ def _validar_backup_zip(caminho_p: Path, resultado: dict) -> dict:
 
     return resultado
 
-
 def _validar_backup_db(caminho_p: Path, resultado: dict) -> dict:
     """Valida backup no formato .db direto."""
     resultado_banco = _validar_banco_sqlite(str(caminho_p))
@@ -1414,7 +1387,7 @@ def _validar_backup_db(caminho_p: Path, resultado: dict) -> dict:
     else:
         # Tentar obter versão e informações adicionais
         try:
-            conn = sqlite3.connect(str(caminho_p))
+            conn = get_connection()
             cursor = conn.cursor()
 
             # Versão
@@ -1450,7 +1423,6 @@ def _validar_backup_db(caminho_p: Path, resultado: dict) -> dict:
 
     return resultado
 
-
 def _validar_banco_sqlite(caminho: str) -> dict:
     """
     Valida a integridade de um banco SQLite.
@@ -1463,7 +1435,7 @@ def _validar_banco_sqlite(caminho: str) -> dict:
     }
 
     try:
-        conn = sqlite3.connect(caminho)
+        conn = get_connection()
 
         # PRAGMA integrity_check
         cursor = conn.cursor()
@@ -1546,7 +1518,6 @@ def _validar_banco_sqlite(caminho: str) -> dict:
 
     return resultado
 
-
 def ler_manifesto_backup(caminho: str) -> dict:
     """
     Lê o manifesto de um backup.
@@ -1578,7 +1549,7 @@ def ler_manifesto_backup(caminho: str) -> dict:
 
         elif caminho_p.suffix == ".db":
             # Para .db, montar manifesto a partir do banco
-            conn = sqlite3.connect(str(caminho_p))
+            conn = get_connection()
             cursor = conn.cursor()
 
             # Versão
@@ -1595,7 +1566,7 @@ def ler_manifesto_backup(caminho: str) -> dict:
                 try:
                     cursor.execute(f'SELECT COUNT(*) FROM "{t}"')
                     total_registros += cursor.fetchone()[0]
-                except sqlite3.OperationalError:
+                except Exception:
                     pass
 
             conn.close()
@@ -1630,7 +1601,6 @@ def ler_manifesto_backup(caminho: str) -> dict:
     except Exception as e:
         return {"erro": f"Erro ao ler manifesto: {str(e)}"}
 
-
 def criar_backup_automatico_pre_restauracao() -> dict:
     """
     Cria um backup automático do banco atual antes de restaurar.
@@ -1658,7 +1628,6 @@ def criar_backup_automatico_pre_restauracao() -> dict:
             "sucesso": False,
             "erro": str(e),
         }
-
 
 # ============================================================
 # BLOCO 10 - BACKUP PORTÁTIL (DOWNLOAD) e RESTAURAÇÃO POR UPLOAD
@@ -1694,7 +1663,7 @@ def gerar_backup_zip_bytes() -> Tuple[bytes, dict]:
     hash_banco = sha256_hash.hexdigest()
     
     # Obter schema version do banco
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("PRAGMA schema_version")
     schema_version = cursor.fetchone()[0]
@@ -1761,7 +1730,7 @@ def gerar_backup_zip_bytes() -> Tuple[bytes, dict]:
     
     # Registrar no banco
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         conn.execute(
             """INSERT INTO configuracoes (chave, valor, descricao)
                VALUES (?, ?, ?)
@@ -1774,7 +1743,6 @@ def gerar_backup_zip_bytes() -> Tuple[bytes, dict]:
         pass
     
     return zip_bytes, metadados
-
 
 def processar_arquivo_enviado(file_bytes: bytes, nome_original: str) -> dict:
     """
@@ -1820,7 +1788,6 @@ def processar_arquivo_enviado(file_bytes: bytes, nome_original: str) -> dict:
     except Exception as e:
         resultado["erros"].append(f"Erro ao processar arquivo: {str(e)}")
         return resultado
-
 
 def _processar_upload_zip(
     file_bytes: bytes, nome_original: str, temp_dir: Path, resultado: dict
@@ -1913,7 +1880,6 @@ def _processar_upload_zip(
         resultado["erros"].append(f"❌ Erro ao processar ZIP: {str(e)}")
         return resultado
 
-
 def _processar_upload_db(
     file_bytes: bytes, nome_original: str, temp_dir: Path, resultado: dict
 ) -> dict:
@@ -1949,7 +1915,6 @@ def _processar_upload_db(
         resultado["erros"].append(f"❌ Erro ao processar banco: {str(e)}")
         return resultado
 
-
 def _extrair_resumo_banco(db_path: Path, nome_original: str, formato: str) -> dict:
     """Extrai informações resumidas de um banco SQLite."""
     resumo = {
@@ -1966,7 +1931,7 @@ def _extrair_resumo_banco(db_path: Path, nome_original: str, formato: str) -> di
     }
     
     try:
-        conn = sqlite3.connect(str(db_path))
+        conn = get_connection()
         cursor = conn.cursor()
         
         # Tabelas
@@ -1983,7 +1948,7 @@ def _extrair_resumo_banco(db_path: Path, nome_original: str, formato: str) -> di
             try:
                 cursor.execute(f'SELECT COUNT(*) FROM "{t}"')
                 total_reg += cursor.fetchone()[0]
-            except sqlite3.OperationalError:
+            except Exception:
                 pass
         resumo["quantidade_registros"] = total_reg
         
@@ -2003,7 +1968,6 @@ def _extrair_resumo_banco(db_path: Path, nome_original: str, formato: str) -> di
         pass
     
     return resumo
-
 
 def executar_restauracao_upload(
     dados_banco: bytes,
@@ -2050,7 +2014,7 @@ def executar_restauracao_upload(
                 }
             
             # Coletar informações
-            conn_temp = sqlite3.connect(str(temp_db))
+            conn_temp = get_connection()
             cursor_temp = conn_temp.cursor()
             cursor_temp.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
@@ -2065,7 +2029,7 @@ def executar_restauracao_upload(
                 try:
                     cursor_temp.execute(f'SELECT COUNT(*) FROM "{t}"')
                     total_reg_restauro += cursor_temp.fetchone()[0]
-                except sqlite3.OperationalError:
+                except Exception:
                     pass
             
             cursor_temp.execute(
@@ -2086,7 +2050,7 @@ def executar_restauracao_upload(
             shutil.rmtree(str(temp_dir), ignore_errors=True)
         
         # 4. Verificar integridade do novo banco
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("PRAGMA integrity_check")
         integridade_final = [r[0] for r in cursor.fetchall()]
@@ -2148,7 +2112,6 @@ def executar_restauracao_upload(
             "tempo_segundos": round(time_module.time() - inicio, 2),
         }
 
-
 def limpar_temporarios_restauracao(temp_dir: Path) -> None:
     """
     Remove diretório temporário usado na validação de restauração.
@@ -2158,7 +2121,6 @@ def limpar_temporarios_restauracao(temp_dir: Path) -> None:
             shutil.rmtree(str(temp_dir), ignore_errors=True)
         except Exception:
             pass
-
 
 def restaurar_backup(caminho_backup: str, usuario: str = "Sistema") -> dict:
     """
@@ -2226,7 +2188,7 @@ def restaurar_backup(caminho_backup: str, usuario: str = "Sistema") -> dict:
                     }
 
                 # Obter informações antes de substituir
-                conn_temp = sqlite3.connect(str(temp_path))
+                conn_temp = get_connection()
                 cursor_temp = conn_temp.cursor()
                 cursor_temp.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 tabelas_restauro = [r[0] for r in cursor_temp.fetchall() if r[0] != "sqlite_sequence"]
@@ -2236,7 +2198,7 @@ def restaurar_backup(caminho_backup: str, usuario: str = "Sistema") -> dict:
                     try:
                         cursor_temp.execute(f'SELECT COUNT(*) FROM "{t}"')
                         total_reg_restauro += cursor_temp.fetchone()[0]
-                    except sqlite3.OperationalError:
+                    except Exception:
                         pass
 
                 cursor_temp.execute("SELECT valor FROM configuracoes WHERE chave = 'db_version'")
@@ -2265,7 +2227,7 @@ def restaurar_backup(caminho_backup: str, usuario: str = "Sistema") -> dict:
                 }
 
             # Obter informações antes de substituir
-            conn_orig = sqlite3.connect(str(caminho_p))
+            conn_orig = get_connection()
             cursor_orig = conn_orig.cursor()
             cursor_orig.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tabelas_restauro = [r[0] for r in cursor_orig.fetchall() if r[0] != "sqlite_sequence"]
@@ -2275,7 +2237,7 @@ def restaurar_backup(caminho_backup: str, usuario: str = "Sistema") -> dict:
                 try:
                     cursor_orig.execute(f'SELECT COUNT(*) FROM "{t}"')
                     total_reg_restauro += cursor_orig.fetchone()[0]
-                except sqlite3.OperationalError:
+                except Exception:
                     pass
 
             cursor_orig.execute("SELECT valor FROM configuracoes WHERE chave = 'db_version'")
@@ -2295,7 +2257,7 @@ def restaurar_backup(caminho_backup: str, usuario: str = "Sistema") -> dict:
             }
 
         # ── Reabrir conexão e verificar integridade ──
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("PRAGMA integrity_check")
         integridade_final = [r[0] for r in cursor.fetchall()]

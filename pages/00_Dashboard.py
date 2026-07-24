@@ -1,12 +1,14 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
+
 import plotly.express as px
 import numpy as np
 from datetime import datetime
 
 from auth import sidebar_usuario
 from permissions import verificar_acesso_pagina
+
+from database import get_connection
 
 # ── Proteção: acesso geral (autenticado) ──
 verificar_acesso_pagina()
@@ -38,7 +40,7 @@ CORES_ABC = {
 # LEITURA BANCO
 # =====================================================
 
-conn = sqlite3.connect("crm.db")
+conn = get_connection()
 
 clientes = pd.read_sql_query(
     "SELECT * FROM clientes",
@@ -545,7 +547,6 @@ def calcular_regressao(y):
     y_proj = np.polyval(coef, x_proj)
     return coef, r2, tendencia, y_proj
 
-
 def formatar_delta(v):
     """Formata valor de variação percentual com cor."""
     if v is None:
@@ -558,7 +559,6 @@ def formatar_delta(v):
     else:
         return f'<span style="color:#6b7280;">{s}</span>'
 
-
 def calcular_variacoes(arr):
     """Retorna lista de variações percentuais (None para o primeiro)."""
     var = [None]
@@ -568,7 +568,6 @@ def calcular_variacoes(arr):
         else:
             var.append(None)
     return var
-
 
 # ══════════════════════════════════════════════════
 # DADOS COMPARTILHADOS (uma única preparação)
@@ -1036,7 +1035,6 @@ with aba_tendencia:
             """,
             unsafe_allow_html=True
         )
-
 
 # ══════════════════════════════════════════════════
 # ABA 2: 📅 SAZONALIDADE

@@ -1,21 +1,17 @@
-import sqlite3
-
+from database import db
 from config import DB_PATH
 from services.comissoes_db import run_comissoes_migrations
 
-
 def init_connection():
     """Configura PRAGMAs recomendados para performance e segurança."""
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = db.get_connection()
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
-    conn.close()
-
 
 def criar_banco():
 
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = db.get_connection()
     cursor = conn.cursor()
 
     # ==================================================
@@ -634,12 +630,12 @@ CREATE TABLE IF NOT EXISTS clientes (
     for coluna in ['status', 'data_cadastro', 'origem_cadastro']:
         try:
             cursor.execute(f"ALTER TABLE clientes ADD COLUMN {coluna} TEXT")
-        except sqlite3.OperationalError:
+        except Exception:
             pass  # coluna ja existe
 
     try:
         cursor.execute("UPDATE clientes SET status = 'ATIVO' WHERE status IS NULL")
-    except sqlite3.OperationalError:
+    except Exception:
         pass
 
     # ==================================================
@@ -653,7 +649,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     ]:
         try:
             cursor.execute(f"ALTER TABLE interacoes ADD COLUMN {coluna_mig[0]} {coluna_mig[1]}")
-        except sqlite3.OperationalError:
+        except Exception:
             pass
 
     # ==================================================
@@ -669,7 +665,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     ]:
         try:
             cursor.execute(f"ALTER TABLE interacoes ADD COLUMN {coluna_mig[0]} {coluna_mig[1]}")
-        except sqlite3.OperationalError:
+        except Exception:
             pass
 
     # Renomear coluna antiga 'status' para 'status_interacao' se existir
@@ -677,7 +673,7 @@ CREATE TABLE IF NOT EXISTS clientes (
         colunas_inter = [row[1] for row in cursor.execute("PRAGMA table_info(interacoes)").fetchall()]
         if 'status' in colunas_inter and 'status_interacao' not in colunas_inter:
             cursor.execute("ALTER TABLE interacoes RENAME COLUMN status TO status_interacao")
-    except sqlite3.OperationalError:
+    except Exception:
         pass
 
     # Migrar dados da tabela antiga pendencias -> pendencias_comerciais
@@ -689,11 +685,11 @@ CREATE TABLE IF NOT EXISTS clientes (
                 SELECT cliente_id, interacao_id, descricao, prioridade, responsavel, data_limite, status, criado_em FROM pendencias
             """)
         cursor.execute("DROP TABLE IF EXISTS pendencias")
-    except sqlite3.OperationalError:
+    except Exception:
         pass
 
     conn.commit()
-    conn.close()
+    db.close()
 
     # ══════════════════════════════════════════════════════
     # MIGRACOES DO MODULO GESTAO COMERCIAL
@@ -701,7 +697,6 @@ CREATE TABLE IF NOT EXISTS clientes (
     run_comissoes_migrations()
 
     print("Banco ULITEC criado com sucesso!")
-
 
 if __name__ == "__main__":
     criar_banco()

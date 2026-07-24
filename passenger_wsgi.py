@@ -135,7 +135,6 @@ HOP_BY_HOP_HEADERS = {
     "transfer-encoding", "upgrade",
 }
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # SISTEMA DE LOG ESTRUTURADO
 # ══════════════════════════════════════════════════════════════════════════════
@@ -151,7 +150,6 @@ HOP_BY_HOP_HEADERS = {
 
 _diagnostic_log = []  # Lista de dicts: {timestamp, level, message}
 _diagnostic_lock = threading.Lock()
-
 
 def _diag_log(level: str, message: str):
     """
@@ -174,22 +172,17 @@ def _diag_log(level: str, message: str):
     line = f"[PASSENGER_WSGI] {timestamp} {level:5s} {message}"
     print(line, file=sys.stderr, flush=True)
 
-
 def _diag_info(msg: str):
     _diag_log("INFO", msg)
-
 
 def _diag_warn(msg: str):
     _diag_log("WARN", msg)
 
-
 def _diag_error(msg: str):
     _diag_log("ERROR", msg)
 
-
 def _diag_debug(msg: str):
     _diag_log("DEBUG", msg)
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # BLOCO 1: DIAGNÓSTICO DO AMBIENTE (EXECUTADO NO IMPORT)
@@ -286,14 +279,14 @@ else:
 #
 # O bootstrap é executado NO PROCESSO PAI (Passenger). Ele configura:
 # - Carregamento do .env
-# - Monkey-patch de sqlite3.connect (força caminho absoluto)
+# - Monkey-patch de .connect (força caminho absoluto)
 # - Ativação de WAL + PRAGMAs
 # - Criação de tabelas (CREATE IF NOT EXISTS)
 # - Migrações de schema (ALTER TABLE defensivos)
 # - Seeds de dados (unidades, tipos de produto, NCMs, configs)
 #
 # Isso é feito AQUI, e não no subprocesso, porque:
-# - O monkey-patch precisa ser aplicado antes de qualquer import que use sqlite3
+# - O monkey-patch precisa ser aplicado antes de qualquer import que use 
 # - O schema precisa existir antes do subprocesso Streamlit iniciar
 # - Se falhar, temos diagnóstico completo antes mesmo de tentar o Streamlit
 # ══════════════════════════════════════════════════════════════════════════════
@@ -404,7 +397,6 @@ _startup_lock = threading.Lock()
 _streamlit_stdout_buffer = []
 _streamlit_stderr_buffer = []
 
-
 def _collect_subprocess_output(process):
     """
     Coleta stdout e stderr do subprocesso de forma não-bloqueante.
@@ -419,7 +411,6 @@ def _collect_subprocess_output(process):
             pass
     except Exception:
         pass
-
 
 def _read_available(pipe, buffer_list):
     """
@@ -438,7 +429,6 @@ def _read_available(pipe, buffer_list):
         pass
     return ""
 
-
 def _is_process_alive(proc) -> bool:
     """
     Verifica se um subprocesso ainda está em execução.
@@ -448,7 +438,6 @@ def _is_process_alive(proc) -> bool:
     if proc is None:
         return False
     return proc.poll() is None
-
 
 def _health_check_http() -> bool:
     """
@@ -483,7 +472,6 @@ def _health_check_http() -> bool:
             return False
     except Exception:
         return False
-
 
 def _start_streamlit() -> bool:
     """
@@ -875,7 +863,6 @@ def _start_streamlit() -> bool:
         # NÃO setar _streamlit_ready
         return False
 
-
 def _flush_subprocess_output():
     """
     Lê e descarta stdout/stderr pendentes do subprocesso morto.
@@ -900,7 +887,6 @@ def _flush_subprocess_output():
                     )
         except Exception:
             pass
-
 
 def _stop_streamlit():
     """
@@ -932,7 +918,6 @@ def _stop_streamlit():
             _streamlit_process = None
             _streamlit_ready = False
 
-
 atexit.register(_stop_streamlit)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -944,7 +929,6 @@ atexit.register(_stop_streamlit)
 # Isso permite identificar o problema sem acesso SSH, apenas visualizando a
 # resposta no navegador.
 # ══════════════════════════════════════════════════════════════════════════════
-
 
 def _build_diagnostic_html(error_summary: str, extra_sections: list[tuple[str, str]] = None) -> str:
     """
@@ -1060,7 +1044,6 @@ def _build_diagnostic_html(error_summary: str, extra_sections: list[tuple[str, s
 </body>
 </html>"""
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # BLOCO 6: FUNÇÃO WSGI application()
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1074,7 +1057,6 @@ def _build_diagnostic_html(error_summary: str, extra_sections: list[tuple[str, s
 # 4. Se Streamlit está pronto → proxy reverso HTTP
 # 5. Se proxy falhar (conexão recusada) → registra e retorna 502
 # ══════════════════════════════════════════════════════════════════════════════
-
 
 def _convert_wsgi_environ_to_headers(environ: dict) -> dict:
     """
@@ -1109,7 +1091,6 @@ def _convert_wsgi_environ_to_headers(environ: dict) -> dict:
     headers["Host"] = f"{STREAMLIT_HOST}:{STREAMLIT_PORT}"
 
     return headers
-
 
 def application(environ: dict, start_response):
     """
@@ -1355,7 +1336,6 @@ def application(environ: dict, start_response):
         ]
         start_response(status, resp_headers)
         return [html.encode("utf-8")]
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FIM DO MÓDULO

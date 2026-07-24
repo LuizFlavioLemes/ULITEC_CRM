@@ -16,7 +16,6 @@ PERIODOS = [
     "Ultimos 6 meses", "Ultimos 12 meses", "Ano atual",
 ]
 
-
 def render():
     """Renderiza a aba de Dashboard."""
     periodo = st.selectbox(

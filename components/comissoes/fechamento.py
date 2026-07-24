@@ -14,7 +14,6 @@ from services.comissoes_dashboard import resumo_competencia
 MESES_NOME = ["Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
               "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
-
 def render():
     """Renderiza a aba de Fechamento Mensal."""
     hoje = date.today()

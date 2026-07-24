@@ -1,5 +1,4 @@
 from pathlib import Path
-import sqlite3
 
 import streamlit as st
 
@@ -7,6 +6,7 @@ from auth import sidebar_usuario
 from permissions import (
     verificar_acesso_pagina,
 )
+from database import get_connection
 from services.relacionamento import (
     salvar_configs_relacionamento,
     carregar_configs_relacionamento,
@@ -19,10 +19,8 @@ from services.relacionamento import (
 verificar_acesso_pagina("MASTER", "SÓCIO", "GERENTE")
 sidebar_usuario()
 
-
 DB_PATH = Path("crm.db")
 BACKUP_DIR = Path("backups")
-
 
 st.title("⚙️ Administração")
 
@@ -1896,7 +1894,7 @@ with aba7:
 
     st.subheader("👥 Gestão de Usuários")
 
-    conn_usr = sqlite3.connect(str(DB_PATH))
+    conn_usr = get_connection()
 
     conn_usr.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (

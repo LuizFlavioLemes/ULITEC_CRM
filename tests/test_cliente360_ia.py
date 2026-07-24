@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 # Adiciona diretório raiz ao path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from database import criar_banco
+from utils.db_init import garantir_schema as criar_banco
 from services.ia.data_collector import (
     coletar_cliente,
     coletar_faturamento,
@@ -43,7 +43,7 @@ class TestTabelasIA(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        criar_banco()
+        criar_banco(DB_PATH)
 
     def test_tabela_config_ia_existe(self):
         conn = sqlite3.connect(DB_PATH)
@@ -97,7 +97,7 @@ class TestColetaDados(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        criar_banco()
+        criar_banco(DB_PATH)
         # Garante que existe pelo menos um cliente para testar
         conn = sqlite3.connect(DB_PATH)
         conn.execute(
@@ -224,7 +224,7 @@ class TestLogs(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        criar_banco()
+        criar_banco(DB_PATH)
 
     def test_salvar_log(self):
         _salvar_log(

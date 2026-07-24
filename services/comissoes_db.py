@@ -1,13 +1,12 @@
 """Migracoes e queries SQL do modulo Gestao Comercial. Sem regras de negocio."""
 
-import sqlite3
 from config import DB_PATH
 
+from database import get_connection
 
 def get_conn():
     """Retorna conexão com o banco SQLite."""
-    return sqlite3.connect(str(DB_PATH))
-
+    return get_connection()
 
 def run_comissoes_migrations():
     """
@@ -121,7 +120,7 @@ def run_comissoes_migrations():
     try:
         cursor.execute("ALTER TABLE parceiros RENAME COLUMN escopo TO faturamento_considerado")
         conn.commit()
-    except sqlite3.OperationalError:
+    except Exception:
         pass
 
     # ═══════════════════════════════════════════════════════════
@@ -130,7 +129,7 @@ def run_comissoes_migrations():
     try:
         cursor.execute("ALTER TABLE fechamento_mensal ADD COLUMN quantidade_clientes INTEGER DEFAULT 0")
         conn.commit()
-    except sqlite3.OperationalError:
+    except Exception:
         pass
 
     # ═══════════════════════════════════════════════════════════
@@ -149,12 +148,11 @@ def run_comissoes_migrations():
     for idx_name, tbl, col in indices:
         try:
             cursor.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {tbl}({col})")
-        except sqlite3.OperationalError:
+        except Exception:
             pass
 
     conn.commit()
     conn.close()
-
 
 # ═══════════════════════════════════════════════════════════
 # QUERIES SQL (sem regras de negocio)
@@ -174,7 +172,6 @@ def query_faturamento_periodo(data_inicio: str, data_fim: str) -> list:
     conn.close()
     return rows
 
-
 def query_faturamento_periodo_unidade(data_inicio: str, data_fim: str, unidade: str) -> list:
     """Retorna faturamento agregado por cliente filtrando por unidade."""
     conn = get_conn()
@@ -190,7 +187,6 @@ def query_faturamento_periodo_unidade(data_inicio: str, data_fim: str, unidade: 
     conn.close()
     return rows
 
-
 def query_carteira_parceiro(parceiro_id: int) -> list:
     """Retorna os cliente_ids da carteira de um parceiro."""
     conn = get_conn()
@@ -203,7 +199,6 @@ def query_carteira_parceiro(parceiro_id: int) -> list:
     rows = [row[0] for row in cursor.fetchall()]
     conn.close()
     return rows
-
 
 def query_parceiros_ativos() -> list:
     """Retorna todos os parceiros ativos com dados do contrato."""
@@ -220,7 +215,6 @@ def query_parceiros_ativos() -> list:
     rows = cursor.fetchall()
     conn.close()
     return rows
-
 
 def query_parceiro_por_id(parceiro_id: int) -> dict:
     """Retorna dados completos de um parceiro."""
@@ -245,7 +239,6 @@ def query_parceiro_por_id(parceiro_id: int) -> dict:
         }
     return {}
 
-
 def query_fechamentos_por_competencia(competencia: str) -> list:
     """Retorna fechamentos de uma competencia especifica."""
     conn = get_conn()
@@ -268,7 +261,6 @@ def query_fechamentos_por_competencia(competencia: str) -> list:
     conn.close()
     return rows
 
-
 def query_fechamentos_por_parceiro(parceiro_id: int) -> list:
     """Retorna historico de fechamentos de um parceiro."""
     conn = get_conn()
@@ -284,7 +276,6 @@ def query_fechamentos_por_parceiro(parceiro_id: int) -> list:
     rows = cursor.fetchall()
     conn.close()
     return rows
-
 
 def query_comissoes_avulsas_abertas() -> list:
     """Retorna comissoes avulsas com pagamento previsto para breve (7 dias)."""
@@ -306,7 +297,6 @@ def query_comissoes_avulsas_abertas() -> list:
     rows = cursor.fetchall()
     conn.close()
     return rows
-
 
 def query_comissoes_avulsas_vencidas() -> list:
     """Retorna comissoes avulsas com data prevista <= hoje e nao pagas."""

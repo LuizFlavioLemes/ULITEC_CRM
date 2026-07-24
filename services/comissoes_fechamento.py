@@ -22,7 +22,6 @@ from services.comissoes_db import (
     query_faturamento_periodo_unidade,
 )
 
-
 def _get_usuario() -> str:
     """Retorna o nome do usuário logado."""
     try:
@@ -30,7 +29,6 @@ def _get_usuario() -> str:
         return st.session_state.get("usuario_nome", "Sistema")
     except Exception:
         return "Sistema"
-
 
 def fechar_competencia(competencia: str) -> list:
     """
@@ -155,7 +153,6 @@ def fechar_competencia(competencia: str) -> list:
     conn.close()
     return ids_criados
 
-
 def registrar_pagamento(fechamento_id: int, observacao: str = ""):
     """
     Registra pagamento de um fechamento.
@@ -176,7 +173,6 @@ def registrar_pagamento(fechamento_id: int, observacao: str = ""):
     """, (usuario, observacao, fechamento_id))
     conn.commit()
     conn.close()
-
 
 # ═══════════════════════════════════════════════════════════
 # COMISSOES AVULSAS
@@ -210,7 +206,6 @@ def criar_comissao_avulsa(dados: dict) -> int:
     conn.close()
     return avulsa_id
 
-
 def atualizar_comissao_avulsa(avulsa_id: int, dados: dict):
     """Atualiza dados de uma comissão avulsa."""
     conn = get_conn()
@@ -241,7 +236,6 @@ def atualizar_comissao_avulsa(avulsa_id: int, dados: dict):
     conn.commit()
     conn.close()
 
-
 def alterar_status_avulsa(avulsa_id: int, novo_status: str):
     """Altera o status de uma comissão avulsa."""
     conn = get_conn()
@@ -261,7 +255,6 @@ def alterar_status_avulsa(avulsa_id: int, novo_status: str):
     conn.commit()
     conn.close()
 
-
 def excluir_comissao_avulsa(avulsa_id: int):
     """Exclui uma comissão avulsa pelo ID."""
     conn = get_conn()
@@ -269,6 +262,4 @@ def excluir_comissao_avulsa(avulsa_id: int):
     cursor.execute("DELETE FROM comissoes_avulsas WHERE id = ?", (avulsa_id,))
     conn.commit()
     conn.close()
-
-
 

@@ -24,7 +24,6 @@ from services.comissoes_db import (
     get_conn,
 )
 
-
 def _aplicar_impostos(valor_bruto: float, aliquota: float) -> tuple:
     """
     Aplica alíquota de impostos sobre o valor bruto.
@@ -36,11 +35,9 @@ def _aplicar_impostos(valor_bruto: float, aliquota: float) -> tuple:
     valor_liquido = valor_bruto - valor_impostos
     return round(valor_impostos, 2), round(valor_liquido, 2)
 
-
 def _calcular_comissao(valor_base: float, percentual: float) -> float:
     """Calcula o valor da comissão com base no percentual."""
     return round(valor_base * (percentual / 100), 2)
-
 
 def projetar_comissao_mes(ano: int, mes: int) -> list:
     """
@@ -185,7 +182,6 @@ def projetar_comissao_mes(ano: int, mes: int) -> list:
         })
 
     return resultados
-
 
 def projetar_por_periodo(ano_inicio: int, mes_inicio: int,
                          ano_fim: int, mes_fim: int,

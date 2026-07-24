@@ -3,7 +3,6 @@ Orquestrador principal do módulo IA.
 Coordena: coleta de dados → montagem de prompt → chamada OpenAI → salvamento de logs.
 """
 
-import sqlite3
 from datetime import datetime
 
 from services.ia.data_collector import (
@@ -19,6 +18,7 @@ from services.ia.ia_client import gerar_relatorio
 
 from config import DB_PATH
 
+from database import get_connection
 
 def _salvar_log(
     cliente_id: int,
@@ -29,7 +29,7 @@ def _salvar_log(
     custo: float,
 ):
     """Salva o log da execução na tabela relatorios_ia."""
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = get_connection()
     try:
         conn.execute(
             """
@@ -51,7 +51,6 @@ def _salvar_log(
         conn.commit()
     finally:
         conn.close()
-
 
 def gerar_relatorio_tecnico(
     prompt_sistema: str,
@@ -80,7 +79,6 @@ def gerar_relatorio_tecnico(
         prompt_usuario=prompt_usuario,
         timeout=timeout,
     )
-
 
 def gerar_analise_cliente(
     cliente_id: int,

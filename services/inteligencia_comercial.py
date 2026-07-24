@@ -15,12 +15,11 @@ Regras de negócio para análise de carteira de clientes:
 
 from datetime import datetime, date, timedelta
 from typing import Optional
-import sqlite3
 
 import pandas as pd
 
 from config import DB_PATH
-
+from database import db, get_connection
 
 # ──────────────────────────────────────────────
 # CONSTANTES
@@ -51,20 +50,17 @@ PENALIDADE_RELACIONAMENTO_ATIVO = 40
 PESO_OS = 20
 PESO_VISITA = 10
 
-
 # ──────────────────────────────────────────────
 # AUXILIARES
 # ──────────────────────────────────────────────
 
-def _get_conn() -> sqlite3.Connection:
-    """Retorna conexão com o banco SQLite."""
-    return sqlite3.connect(str(DB_PATH))
-
+def _get_conn():
+    """Retorna conexão com o banco de dados."""
+    return db.get_connection()
 
 def _data_limite(dias: int) -> str:
     """Retorna data no formato YYYY-MM-DD com N dias atrás."""
     return (date.today() - timedelta(days=dias)).strftime("%Y-%m-%d")
-
 
 def _get_dias(dt_str) -> int:
     """Calcula dias desde uma data string. Retorna 9999 se inválida."""
@@ -74,7 +70,6 @@ def _get_dias(dt_str) -> int:
         return (date.today() - datetime.strptime(dt_str, "%Y-%m-%d").date()).days
     except (ValueError, TypeError):
         return 9999
-
 
 def _normalizar_log(valor, max_val: float):
     """
@@ -92,7 +87,6 @@ def _normalizar_log(valor, max_val: float):
     if max_val <= 0:
         return np.zeros(len(valor))
     return np.where(valor <= 0, 0.0, np.log1p(valor) / np.log1p(max_val))
-
 
 def _verificar_relacionamento_ativo(cliente_ids: list) -> dict:
     """
@@ -133,7 +127,6 @@ def _verificar_relacionamento_ativo(cliente_ids: list) -> dict:
         ids_com_atividade.update(df_opp["cliente_id"].tolist())
 
     return {cid: cid in ids_com_atividade for cid in cliente_ids}
-
 
 # ──────────────────────────────────────────────
 # CLASSIFICAÇÃO ABCD (v1.5.1)
@@ -202,7 +195,6 @@ def classificar_abcd(unidade: Optional[str] = None) -> pd.DataFrame:
     df_result = pd.concat([df_classificar, df_sem_faturamento], ignore_index=True)
     
     return df_result
-
 
 # ──────────────────────────────────────────────
 # CLIENTES ESFRIANDO
@@ -340,7 +332,6 @@ def get_clientes_esfriando(unidade: Optional[str] = None) -> pd.DataFrame:
         "variacao", "dias_sem_visita"
     ]].sort_values("variacao", ascending=True).reset_index(drop=True)
 
-
 # ──────────────────────────────────────────────
 # CLIENTES ESQUENTANDO
 # ──────────────────────────────────────────────
@@ -449,7 +440,6 @@ def get_clientes_esquentando(unidade: Optional[str] = None) -> pd.DataFrame:
         "cliente", "cidade", "estado", "variacao", "faturamento"
     ]].sort_values("variacao", ascending=False).reset_index(drop=True)
 
-
 # ──────────────────────────────────────────────
 # CLIENTES SEM VISITA
 # ──────────────────────────────────────────────
@@ -498,7 +488,6 @@ def get_clientes_sem_visita(unidade: Optional[str] = None) -> pd.DataFrame:
     df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df
-
 
 # ──────────────────────────────────────────────
 # CLIENTES SEM FATURAMENTO
@@ -590,7 +579,6 @@ def get_clientes_sem_faturamento(unidade: Optional[str] = None) -> pd.DataFrame:
 
     return df[["cliente", "máquinas", "última OS", "último faturamento"]]
 
-
 # ──────────────────────────────────────────────
 # CLIENTES COM MUITAS OS
 # ──────────────────────────────────────────────
@@ -627,7 +615,6 @@ def get_clientes_muitas_os(unidade: Optional[str] = None) -> pd.DataFrame:
     conn.close()
     return df
 
-
 # ──────────────────────────────────────────────
 # CLIENTES COM PARQUE MITSUBISHI RELEVANTE
 # ──────────────────────────────────────────────
@@ -663,7 +650,6 @@ def get_clientes_parque_relevante(unidade: Optional[str] = None) -> pd.DataFrame
     df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df
-
 
 # ──────────────────────────────────────────────
 # SCORE COMERCIAL v1.5.2 — PRIORIZAÇÃO INTELIGENTE
@@ -1073,7 +1059,6 @@ def calcular_score_comercial(unidade: Optional[str] = None) -> pd.DataFrame:
         "motivo_prioridade", "proxima_acao", "explicacao_score",
         "relacionamento_ativo", "queda_fat_pct", "dias_sem_manutencao"
     ]].sort_values("score", ascending=False).head(TOP_SCORE).reset_index(drop=True)
-
 
 # ──────────────────────────────────────────────
 # RESUMO EXECUTIVO
