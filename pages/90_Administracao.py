@@ -6,6 +6,7 @@ from auth import sidebar_usuario
 from permissions import (
     verificar_acesso_pagina,
 )
+from config import DB_PATH
 from database import get_connection
 from services.relacionamento import (
     salvar_configs_relacionamento,
@@ -19,7 +20,6 @@ from services.relacionamento import (
 verificar_acesso_pagina("MASTER", "SÓCIO", "GERENTE")
 sidebar_usuario()
 
-DB_PATH = Path("crm.db")
 BACKUP_DIR = Path("backups")
 
 st.title("⚙️ Administração")
