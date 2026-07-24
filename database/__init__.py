@@ -31,12 +31,11 @@ def _get_db() -> DatabaseProvider:
     """Retorna a instância singleton do provider, inicializando se necessário."""
     global _db_instance
     if _db_instance is None:
-        import os
-        from pathlib import Path
-        # Determina o caminho do banco sem importar config (evita circular)
-        root = Path(__file__).resolve().parent.parent
-        db_path = root / "crm.db"
-        _db_instance = SQLiteProvider(str(db_path))
+        # Importa config APÓS a função para evitar import circular.
+        # config importa services.version, que pode importar database.
+        # Este import tardio quebra o ciclo.
+        from config import DB_PATH
+        _db_instance = SQLiteProvider(str(DB_PATH))
     return _db_instance
 
 

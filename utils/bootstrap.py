@@ -25,8 +25,10 @@ try:
 except ImportError:
     pass  # dotenv não instalado — sem crash
 
-# ── 3. Caminho absoluto do banco (compatível com monkey-patch legado) ──
-DB_ABSOLUTE_PATH = str(ROOT_DIR / "crm.db")
+# ── 3. Caminho do banco (único ponto: config.DB_PATH) ──
+# Importa config DEPOIS do .env para que DB_PATH env var já esteja carregada.
+from config import DB_PATH
+DB_ABSOLUTE_PATH = str(DB_PATH)
 
 # ═══════════════════════════════════════════════════════════
 # 4. MONKEY-PATCH .connect (interceptação global)

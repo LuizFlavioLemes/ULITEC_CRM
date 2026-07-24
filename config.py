@@ -29,8 +29,14 @@ ROOT_DIR = Path(__file__).resolve().parent
 # ═══════════════════════════════════════════════════════════
 # BANCO DE DADOS
 # ═══════════════════════════════════════════════════════════
+# A variável DB_PATH é o ÚNICO ponto de definição do caminho
+# do banco SQLite em todo o sistema.
+#
+# Railway:   DB_PATH=/data/crm.db     (volume persistente)
+# Windows:   usa fallback → ROOT_DIR / "crm.db"
+# ═══════════════════════════════════════════════════════════
 
-DB_PATH = ROOT_DIR / "crm.db"
+DB_PATH = Path(os.getenv("DB_PATH", str(ROOT_DIR / "crm.db")))
 
 # ═══════════════════════════════════════════════════════════
 # PASTAS DO SISTEMA (criadas automaticamente se necessário)
