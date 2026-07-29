@@ -1,4 +1,4 @@
-from database import db
+from database import db, get_connection
 from config import DB_PATH
 from services.comissoes_db import run_comissoes_migrations
 

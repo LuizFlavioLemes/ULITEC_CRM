@@ -24,8 +24,6 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from database import get_connection
-
 # ═══════════════════════════════════════════════════════════
 # METADADOS OFICIAIS DA VERSÃO
 # ═══════════════════════════════════════════════════════════
@@ -51,6 +49,7 @@ PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.versio
 def _detect_db_version() -> str:
     """Tenta detectar a versão do SQLite em uso."""
     try:
+        from database import get_connection
         conn = get_connection()
         cursor = conn.execute("SELECT sqlite_version()")
         ver = cursor.fetchone()[0]

@@ -20,6 +20,11 @@ st.set_page_config(
 )
 
 st.title("📦 Pipeline de Ordens de Serviço")
+st.markdown(
+    "Gerencie propostas, ordens de serviço, follow-ups e andamento operacional. "
+    "Acompanhe o ciclo completo desde o recebimento até a expedição."
+)
+st.divider()
 
 # ── Inicialização da segregação por filial ──
 if "perfil" not in st.session_state:

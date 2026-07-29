@@ -43,6 +43,11 @@ verificar_acesso_pagina()
 sidebar_usuario()
 
 st.title("🎯 Cliente 360°")
+st.markdown(
+    "Histórico completo do cliente, relacionamento, faturamento, "
+    "máquinas e oportunidades. Consulte dados cadastrais, análise IA e timeline unificada."
+)
+st.divider()
 
 conn = get_connection()
 

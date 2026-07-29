@@ -49,6 +49,17 @@ RESULTADOS = ["Positivo", "Neutro", "Negativo"]
 
 PRIORIDADES = ["ALTA", "MEDIA", "BAIXA"]
 
+TIPOS_PENDENCIA = [
+    "Visita",
+    "Follow-up",
+    "Proposta",
+    "Venda",
+    "Cobrança",
+    "Preventiva",
+    "Assistência Técnica",
+    "Outro",
+]
+
 TIPOS_PROXIMA_ACAO = [
     "Ligar",
     "WhatsApp",
@@ -416,6 +427,7 @@ def criar_pendencia(
     responsavel: str = "",
     data_limite: Optional[str] = None,
     interacao_id: Optional[int] = None,
+    tipo_pendencia: Optional[str] = None,
 ) -> int:
     """
     Cria uma pendência comercial.
@@ -431,11 +443,11 @@ def criar_pendencia(
             """
             INSERT INTO pendencias_comerciais
                 (cliente_id, interacao_id, descricao, prioridade,
-                 responsavel, data_limite, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'ABERTA')
+                 responsavel, data_limite, status, tipo_pendencia)
+            VALUES (?, ?, ?, ?, ?, ?, 'ABERTA', ?)
             """,
             (cliente_id, interacao_id, descricao, prioridade,
-             responsavel, data_limite),
+             responsavel, data_limite, tipo_pendencia),
         )
         pendencia_id = cursor.lastrowid
         conn.commit()

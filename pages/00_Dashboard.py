@@ -24,6 +24,11 @@ st.set_page_config(
 )
 
 st.title("📊 Dashboard Comercial ULITEC")
+st.markdown(
+    "Visão executiva da empresa com indicadores, tendências e desempenho comercial. "
+    "Acompanhe métricas de faturamento, inadimplência e classificação de clientes."
+)
+st.divider()
 
 # =====================================================
 # CORES ABC
