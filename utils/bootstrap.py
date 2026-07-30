@@ -245,6 +245,53 @@ def _init_database():
     for sql in TABLES:
         cur.execute(sql)
 
+    # ── Tabelas do módulo Gestão Comercial (Comissões) ──
+    TABELAS_COMISSOES = [
+        """CREATE TABLE IF NOT EXISTS parceiros (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL, telefone TEXT, email TEXT, pix TEXT,
+            observacoes TEXT, status TEXT DEFAULT 'ATIVO',
+            percentual REAL DEFAULT 0, base_calculo TEXT DEFAULT 'BRUTO',
+            aliquota_impostos REAL DEFAULT 0,
+            faturamento_considerado TEXT DEFAULT 'GRUPO',
+            dias_pagamento INTEGER DEFAULT 10,
+            criado_em DATE DEFAULT (date('now')),
+            atualizado_em DATE DEFAULT (date('now')))""",
+        """CREATE TABLE IF NOT EXISTS carteira_clientes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parceiro_id INTEGER NOT NULL, cliente_id INTEGER NOT NULL,
+            FOREIGN KEY (parceiro_id) REFERENCES parceiros(id) ON DELETE CASCADE,
+            FOREIGN KEY (cliente_id) REFERENCES clientes(id),
+            UNIQUE(parceiro_id, cliente_id))""",
+        """CREATE TABLE IF NOT EXISTS fechamento_mensal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parceiro_id INTEGER NOT NULL, competencia TEXT NOT NULL,
+            percentual REAL NOT NULL, base_calculo TEXT NOT NULL,
+            aliquota_impostos REAL NOT NULL,
+            faturamento_considerado TEXT NOT NULL,
+            clientes_json TEXT NOT NULL DEFAULT '[]',
+            quantidade_clientes INTEGER DEFAULT 0,
+            valor_bruto REAL DEFAULT 0, valor_impostos REAL DEFAULT 0,
+            valor_liquido REAL DEFAULT 0, valor_comissao REAL DEFAULT 0,
+            status TEXT DEFAULT 'PREVIEW', fechado_em DATE,
+            fechado_por TEXT, data_pagamento DATE, usuario_pagamento TEXT,
+            observacao_pagamento TEXT, criado_em DATE DEFAULT (date('now')),
+            FOREIGN KEY (parceiro_id) REFERENCES parceiros(id))""",
+        """CREATE TABLE IF NOT EXISTS comissoes_avulsas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parceiro_id INTEGER NOT NULL, cliente_id INTEGER, os_id INTEGER,
+            descricao TEXT, valor_faturado REAL DEFAULT 0,
+            percentual REAL DEFAULT 0, valor_comissao REAL DEFAULT 0,
+            data_prevista DATE, data_pagamento DATE,
+            status TEXT DEFAULT 'AGUARDANDO_FATURAMENTO',
+            observacoes TEXT, criado_em DATE DEFAULT (date('now')),
+            atualizado_em DATE DEFAULT (date('now')),
+            FOREIGN KEY (parceiro_id) REFERENCES parceiros(id),
+            FOREIGN KEY (cliente_id) REFERENCES clientes(id))""",
+    ]
+    for sql in TABELAS_COMISSOES:
+        cur.execute(sql)
+
     # ── ALTER TABLE defensivo (colunas que podem faltar em bases antigas) ──
     _add_col(cur, "fornecedores_produto", "ativo", "INTEGER DEFAULT 1")
     _add_col(cur, "fornecedores_produto", "criado_em", "DATE DEFAULT (date('now'))")
