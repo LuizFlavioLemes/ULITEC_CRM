@@ -3,7 +3,7 @@ Utilitários compartilhados entre os módulos de Inteligência Comercial.
 """
 
 from datetime import datetime, date, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 
 import pandas as pd
 import numpy as np
@@ -39,9 +39,150 @@ PENALIDADE_RELACIONAMENTO_ATIVO = 40
 PESO_OS = 20
 PESO_VISITA = 10
 
+# ──────────────────────────────────────────────
+# UFS VÁLIDAS
+# ──────────────────────────────────────────────
+
+UFS_VALIDAS = frozenset({
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO",
+    "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI",
+    "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+})
 
 # ──────────────────────────────────────────────
-# FUNÇÕES AUXILIARES
+# NORMALIZAÇÃO CIDADE / ESTADO
+# ──────────────────────────────────────────────
+
+def normalizar_cidade_estado(cidade: str, estado: Optional[str] = None) -> Tuple[str, Optional[str]]:
+    """
+    Normaliza cidade e estado extraindo a UF do final do nome da cidade.
+
+    Regras:
+    - Se cidade termina com ' - XX' onde XX é UF válida, extrai.
+    - Se estado já está preenchido corretamente (não vazio, não '-'), mantém.
+    - Se estado está vazio, '-' ou None, usa o extraído.
+    - Se não reconhece padrão, retorna original.
+
+    Args:
+        cidade: Nome da cidade (ex: "CAMPINAS - SP")
+        estado: UF atual (pode ser "", "-", None)
+
+    Returns:
+        Tupla (cidade_normalizada, estado_normalizado)
+    """
+    cidade_str = str(cidade).strip() if cidade else ""
+    estado_str = str(estado).strip().upper() if estado else ""
+    estado_str = estado_str if estado_str not in ("", "-", "NONE") else ""
+
+    # Se estado já está preenchido corretamente, não altera
+    if estado_str and estado_str in UFS_VALIDAS:
+        return cidade_str, estado_str
+
+    # Tentar extrair UF do final da cidade: "CIDADE - XX"
+    if not cidade_str:
+        return cidade_str, estado_str if estado_str else None
+
+    partes = cidade_str.rsplit(" - ", 1)
+    if len(partes) != 2:
+        # Sem " - " no final, mantém original
+        return cidade_str, estado_str if estado_str else None
+
+    cidade_limpa = partes[0].strip()
+    uf_candidata = partes[1].strip().upper()
+
+    # Verificar se a UF extraída é válida
+    if uf_candidata in UFS_VALIDAS:
+        return cidade_limpa, uf_candidata
+
+    # UF extraída inválida, mantém original
+    return cidade_str, estado_str if estado_str else None
+
+
+# ──────────────────────────────────────────────
+# FALLBACK DE ESTADO NA INTELIGÊNCIA COMERCIAL
+# ──────────────────────────────────────────────
+
+def obter_estado_fallback(cidade: str, estado: Optional[str] = None) -> Optional[str]:
+    """
+    Retorna o estado, usando fallback da UF extraída da cidade se necessário.
+
+    Usado na camada de Service para garantir que filtros por UF funcionem
+    mesmo com dados inconsistentes no banco.
+
+    Args:
+        cidade: Nome da cidade
+        estado: UF atual (pode ser vazio, "-", None)
+
+    Returns:
+        UF normalizada ou None se não foi possível determinar
+    """
+    _, estado_normalizado = normalizar_cidade_estado(cidade, estado)
+    return estado_normalizado
+
+
+# ──────────────────────────────────────────────
+# SANEAMENTO DE DADOS EXISTENTES
+# ──────────────────────────────────────────────
+
+def sancar_cidade_estado() -> dict:
+    """
+    Rotina de saneamento de dados existentes.
+
+    Percorre todos os clientes e identifica registros onde:
+    - estado é vazio, "-" ou NULL
+    - cidade termina com " - XX" onde XX é UF válida
+
+    Extrai automaticamente a UF da cidade e salva no banco.
+
+    Returns:
+        dict com:
+            "corrigidos": int - quantidade de registros corrigidos
+            "ignorados": int - quantidade de registros com padrão não reconhecido
+    """
+    conn = _get_conn()
+    cursor = conn.cursor()
+
+    # Buscar clientes com estado inconsistente
+    cursor.execute("""
+        SELECT id, cidade, estado
+        FROM clientes
+        WHERE estado IS NULL
+           OR estado = ''
+           OR estado = '-'
+           OR estado = 'NONE'
+    """)
+
+    registros = cursor.fetchall()
+    corrigidos = 0
+    ignorados = 0
+
+    for cliente_id, cidade, estado_atual in registros:
+        cidade_normalizada, estado_normalizado = normalizar_cidade_estado(
+            cidade, estado_atual
+        )
+
+        if estado_normalizado and estado_normalizado != (str(estado_atual).strip().upper() if estado_atual else ""):
+            # Houve extração bem-sucedida
+            cursor.execute(
+                "UPDATE clientes SET cidade = ?, estado = ? WHERE id = ?",
+                (cidade_normalizada, estado_normalizado, cliente_id)
+            )
+            corrigidos += 1
+        elif " - " in (str(cidade).strip() if cidade else ""):
+            # Tem " - " no nome mas UF não reconhecida
+            ignorados += 1
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "corrigidos": corrigidos,
+        "ignorados": ignorados,
+    }
+
+
+# ──────────────────────────────────────────────
+# FUNÇÕES AUXILIARES (EXISTENTES)
 # ──────────────────────────────────────────────
 
 def _get_conn():

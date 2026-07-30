@@ -7,6 +7,7 @@ from datetime import datetime, date
 from auth import sidebar_usuario
 from permissions import verificar_acesso_pagina, pode_importar
 from services import formatar_clientes_para_select
+from services.inteligencia.utils import normalizar_cidade_estado
 
 from database import get_connection
 
@@ -119,7 +120,8 @@ with tab1:
 
                         razao_social = str(df_cli.iloc[i, 2]).strip()
                         nome_fantasia = str(df_cli.iloc[i, 4]).strip()
-                        cidade = str(df_cli.iloc[i, 6]).strip()
+                        cidade_raw = str(df_cli.iloc[i, 6]).strip()
+                        cidade, estado = normalizar_cidade_estado(cidade_raw)
                         telefone = str(df_cli.iloc[i, 7]).strip()
                         email = str(df_cli.iloc[i, 10]).strip()
 
@@ -141,6 +143,7 @@ with tab1:
                                     razao_social=?,
                                     nome_fantasia=?,
                                     cidade=?,
+                                    estado=?,
                                     telefone=?,
                                     email=?
                                 WHERE codigo_erp=?
@@ -149,6 +152,7 @@ with tab1:
                                     razao_social,
                                     nome_fantasia,
                                     cidade,
+                                    estado,
                                     telefone,
                                     email,
                                     codigo
@@ -164,16 +168,18 @@ with tab1:
                                     razao_social,
                                     nome_fantasia,
                                     cidade,
+                                    estado,
                                     telefone,
                                     email
                                 )
-                                VALUES (?, ?, ?, ?, ?, ?)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
                                 """,
                                 (
                                     codigo,
                                     razao_social,
                                     nome_fantasia,
                                     cidade,
+                                    estado,
                                     telefone,
                                     email
                                 )

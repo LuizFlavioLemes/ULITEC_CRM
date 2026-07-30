@@ -249,7 +249,7 @@ def calcular_score_comercial(unidade: Optional[str] = None) -> pd.DataFrame:
     df = df.rename(columns={"razao_social": "cliente"})
 
     return df[[
-        "cliente", "cidade", "score", "classificacao", "classe_abc",
+        "cliente", "cidade", "estado", "score", "classificacao", "classe_abc",
         "fat_12m", "qtd_maquinas", "dias_sem_contato", "dias_sem_visita",
         "motivo_prioridade", "proxima_acao", "explicacao_score",
         "relacionamento_ativo", "queda_fat_pct", "dias_sem_manutencao"

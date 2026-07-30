@@ -11,7 +11,7 @@ from typing import Optional
 import pandas as pd
 
 from services.inteligencia.utils import (
-    _get_conn, _data_limite,
+    _get_conn, _data_limite, obter_estado_fallback,
     LIMITE_DIAS_VISITA_ESFRIANDO, LIMITE_DIAS_SEM_VISITA,
     LIMITE_MESES_SEM_FATURAMENTO, PERIODO_ATUAL_DIAS,
     PERIODO_ANTERIOR_DIAS, TOP_N,
@@ -167,7 +167,7 @@ def get_clientes_sem_visita(unidade: Optional[str] = None) -> pd.DataFrame:
     """Clientes nunca visitados ou com última visita > 90 dias."""
     conn = _get_conn()
     data_limite = _data_limite(LIMITE_DIAS_SEM_VISITA)
-    query = """SELECT c.razao_social AS cliente, c.cidade,
+    query = """SELECT c.razao_social AS cliente, c.cidade, c.estado,
         CASE WHEN c.ultima_visita IS NULL THEN NULL
             ELSE CAST(julianday('now') - julianday(c.ultima_visita) AS INTEGER) END AS dias_sem_visita,
         CASE WHEN c.ultima_visita IS NULL THEN 'NUNCA_VISITADO' ELSE 'VISITA_ATRASADA' END AS tipo
