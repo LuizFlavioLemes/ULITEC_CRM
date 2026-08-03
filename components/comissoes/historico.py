@@ -42,10 +42,13 @@ def render():
 
     dados = []
     for f in fechamentos:
+        # Fechamentos mensais são sempre calculados automaticamente
+        # (percentual × faturamento). Manter visível para auditoria.
         dados.append({
             "Competencia": f["competencia"],
             "Parceiro": f["parceiro_nome"],
             "Clientes": f["quantidade_clientes"],
+            "Modo": "Automática",
             "Base": f["base_calculo"],
             "Valor Bruto": f"R$ {f['valor_bruto']:,.2f}",
             "Valor Liquido": f"R$ {f['valor_liquido']:,.2f}",

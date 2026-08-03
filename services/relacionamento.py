@@ -196,6 +196,9 @@ def registrar_interacao(
     # v1.0.5 — próxima ação estruturada
     tipo_prox_acao: Optional[str] = None,
     obs_prox_acao: Optional[str] = None,
+    entregou_brinde: Optional[str] = None,
+    descricao_brinde: Optional[str] = None,
+    data_brinde: Optional[str] = None,
 ) -> int:
     """
     Registra uma interação e atualiza clientes.ultima_visita.
@@ -220,9 +223,11 @@ def registrar_interacao(
                  status_cliente, nivel_producao, perspectiva_6m, concorrentes,
                  resultado_comercial,
                  contato_nome, contato_cargo, contato_telefone, contato_email,
-                 tipo_prox_acao, obs_prox_acao)
+                 tipo_prox_acao, obs_prox_acao,
+                 entregou_brinde, descricao_brinde, data_brinde)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?)
             """,
             (
                 cliente_id,
@@ -251,6 +256,9 @@ def registrar_interacao(
                 contato_email,
                 tipo_prox_acao,
                 obs_prox_acao,
+                entregou_brinde,
+                descricao_brinde,
+                data_brinde,
             ),
         )
         interacao_id = cursor.lastrowid

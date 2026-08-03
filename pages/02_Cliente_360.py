@@ -45,7 +45,7 @@ sidebar_usuario()
 st.title("🎯 Cliente 360°")
 st.markdown(
     "Histórico completo do cliente, relacionamento, faturamento, "
-    "máquinas e oportunidades. Consulte dados cadastrais, análise IA e timeline unificada."
+    "máquinas e pendências. Consulte dados cadastrais, análise IA e timeline unificada."
 )
 st.divider()
 
@@ -189,7 +189,7 @@ c_rel3.metric(
 )
 
 c_rel4.metric(
-    "💰 Oportunidades (Relac.)",
+    "💰 Pendências (Relac.)",
     ind_relac["oportunidades_relacionamento"],
 )
 
@@ -203,7 +203,7 @@ tabs = st.tabs(
         "Visitas",
         "Máquinas",
         "Faturamento",
-        "Oportunidades",
+        "📌 Pendências",
         "🤖 Análise IA",
         "📞 Relacionamento",
         "📋 OS Aguardando Aprovação",
@@ -403,10 +403,12 @@ with tabs[3]:
         st.info("Sem faturamento.")
 
 # ==================================================
-# OPORTUNIDADES
+# PENDÊNCIAS COMERCIAIS
 # ==================================================
 
 with tabs[4]:
+
+    st.subheader("📌 Pendências Comerciais")
 
     try:
 
@@ -419,13 +421,16 @@ with tabs[4]:
             conn
         )
 
-        st.dataframe(
-            op_df,
-            width="stretch"
-        )
+        if op_df.empty:
+            st.info("Nenhuma pendência encontrada.")
+        else:
+            st.dataframe(
+                op_df,
+                width="stretch"
+            )
 
     except:
-        st.info("Sem oportunidades.")
+        st.info("Nenhuma pendência encontrada.")
 
 # ==================================================
 # ANÁLISE IA
@@ -651,8 +656,8 @@ with tabs[6]:
 
     st.markdown("---")
 
-    # ── Bloco 3: Oportunidades com Follow-up Pendente ──
-    st.markdown("### 📅 Oportunidades com Follow-up Pendente")
+    # ── Bloco 3: Pendências com Follow-up Pendente ──
+    st.markdown("### 📅 Pendências com Follow-up Pendente")
     try:
         conn_local = get_connection()
         df_opp_followup = pd.read_sql_query(
@@ -691,7 +696,7 @@ with tabs[6]:
 
     # ── Bloco 4: Timeline Unificada (v1.3) ──
     st.markdown("### 📋 Timeline Unificada")
-    st.caption("Interações, evoluções, pendências e oportunidades em ordem cronológica.")
+    st.caption("Interações, evoluções e pendências em ordem cronológica.")
     try:
         df_timeline = get_timeline_unificada(cliente_id, limite=50)
 

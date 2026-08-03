@@ -469,6 +469,9 @@ def garantir_schema(db_path: str):
     _add_column_if_missing(cur, "fornecedores_produto", "criado_em", "DATE DEFAULT (date('now'))")
     _add_column_if_missing(cur, "fornecedores_produto", "atualizado_em", "DATE DEFAULT (date('now'))")
 
+    _add_column_if_missing(cur, "produtos_importados_fornecedores", "principal", "INTEGER DEFAULT 0")
+    _add_column_if_missing(cur, "comissoes_avulsas", "modo_calculo", "TEXT DEFAULT 'AUTOMATICO'")
+
     _add_column_if_missing(cur, "ordens_servico", "tecnico", "TEXT DEFAULT ''")
 
     _add_column_if_missing(cur, "clientes", "status", "TEXT DEFAULT 'ATIVO'")

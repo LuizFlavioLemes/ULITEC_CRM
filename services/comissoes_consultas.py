@@ -157,7 +157,7 @@ def listar_comissoes_avulsas(parceiro_id: Optional[int] = None) -> list:
                    ca.valor_faturado, ca.percentual, ca.valor_comissao,
                    ca.data_prevista, ca.data_pagamento,
                    ca.status, ca.observacoes,
-                   ca.criado_em
+                   ca.criado_em, ca.modo_calculo
             FROM comissoes_avulsas ca
             JOIN parceiros p ON p.id = ca.parceiro_id
             LEFT JOIN clientes c ON c.id = ca.cliente_id
@@ -172,7 +172,7 @@ def listar_comissoes_avulsas(parceiro_id: Optional[int] = None) -> list:
                    ca.valor_faturado, ca.percentual, ca.valor_comissao,
                    ca.data_prevista, ca.data_pagamento,
                    ca.status, ca.observacoes,
-                   ca.criado_em
+                   ca.criado_em, ca.modo_calculo
             FROM comissoes_avulsas ca
             JOIN parceiros p ON p.id = ca.parceiro_id
             LEFT JOIN clientes c ON c.id = ca.cliente_id
@@ -200,6 +200,7 @@ def listar_comissoes_avulsas(parceiro_id: Optional[int] = None) -> list:
             "status": r[12],
             "observacoes": r[13],
             "criado_em": r[14],
+            "modo_calculo": r[15] if len(r) > 15 else "AUTOMATICO",
         })
     return resultados
 

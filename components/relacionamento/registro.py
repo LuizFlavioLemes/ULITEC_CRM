@@ -221,11 +221,32 @@ def exibir_registro(clientes_lista, clientes_dict, clientes_reverso):
                     "Concorrentes encontrados",
                     key="reg_concorrentes",
                 )
-                brinde_entregue = st.selectbox(
-                    "Brinde entregue",
-                    options=["", "Não", "Sim"],
-                    key="reg_brinde",
-                )
+                st.markdown("##### Brinde entregue?")
+                col_b1, col_b2 = st.columns(2)
+                with col_b1:
+                    entregou_brinde = st.radio(
+                        "Brinde entregue?",
+                        options=["Não", "Sim"],
+                        key="reg_entregou_brinde",
+                        horizontal=True,
+                        label_visibility="collapsed",
+                    )
+                with col_b2:
+                    pass
+
+                if entregou_brinde == "Sim":
+                    descricao_brinde = st.text_input(
+                        "Qual brinde foi entregue?",
+                        key="reg_descricao_brinde",
+                    )
+                    data_brinde = st.date_input(
+                        "Data da entrega",
+                        value=date.today(),
+                        key="reg_data_brinde",
+                    )
+                else:
+                    descricao_brinde = ""
+                    data_brinde = date.today()
 
             st.divider()
             st.markdown("### 🎯 Resultado Comercial")
@@ -252,6 +273,9 @@ def exibir_registro(clientes_lista, clientes_dict, clientes_reverso):
             perspectiva_6m = None
             concorrentes = None
             resultado_comercial = None
+            entregou_brinde = None
+            descricao_brinde = None
+            data_brinde = None
 
         st.divider()
         st.markdown("### 🏷️ Criar Pendência Comercial")
@@ -327,6 +351,9 @@ def exibir_registro(clientes_lista, clientes_dict, clientes_reverso):
                 contato_email = st.session_state.get("reg_contato_email", "") or None
 
                 try:
+                    # Formatar data_brinde se for date object
+                    data_brinde_str = data_brinde.strftime("%Y-%m-%d") if hasattr(data_brinde, "strftime") else data_brinde
+
                     interacao_id = registrar_interacao(
                         cliente_id=cliente_id,
                         tipo_interacao=tipo_interacao,
@@ -350,6 +377,9 @@ def exibir_registro(clientes_lista, clientes_dict, clientes_reverso):
                         contato_cargo=contato_cargo,
                         contato_telefone=contato_telefone,
                         contato_email=contato_email,
+                        entregou_brinde=entregou_brinde,
+                        descricao_brinde=descricao_brinde or None,
+                        data_brinde=data_brinde_str,
                     )
 
                     if criar_pend:

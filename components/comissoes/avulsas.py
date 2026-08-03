@@ -44,38 +44,72 @@ def render():
 
             opcoes_cli, mapa_cli = listar_clientes_para_select()
 
-            with st.form("form_avulsa"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    parceiro_nomes = [p["nome"] for p in parceiros]
-                    p_sel = st.selectbox("Parceiro *", options=parceiro_nomes)
-                    p_id = next((p["id"] for p in parceiros if p["nome"] == p_sel), None)
-                    cliente_sel = st.selectbox("Cliente (opcional)",
-                                                options=[""] + opcoes_cli)
-                    c_id = mapa_cli.get(cliente_sel) if cliente_sel else None
-                    descricao = st.text_input("Descricao *")
-                    os_id = st.text_input("OS (opcional)", placeholder="Ex: 12345")
-                with col2:
-                    valor_fat = st.number_input("Valor faturado", min_value=0.0,
-                                                 step=100.0, format="%.2f")
-                    percentual = st.number_input("Percentual (%)", min_value=0.0,
-                                                  max_value=100.0, step=0.5,
-                                                  format="%.2f")
-                    data_prev = st.date_input("Data prevista pagamento",
-                                               value=hoje)
-                    obs = st.text_area("Observacoes", height=70)
+            col1, col2 = st.columns(2)
+            with col1:
+                parceiro_nomes = [p["nome"] for p in parceiros]
+                p_sel = st.selectbox("Parceiro *", options=parceiro_nomes,
+                                     key="avulsa_parceiro")
+                p_id = next((p["id"] for p in parceiros if p["nome"] == p_sel), None)
+                cliente_sel = st.selectbox("Cliente (opcional)",
+                                           options=[""] + opcoes_cli,
+                                           key="avulsa_cliente")
+                c_id = mapa_cli.get(cliente_sel) if cliente_sel else None
+                descricao = st.text_input("Descricao *", key="avulsa_desc")
+                os_id = st.text_input("OS (opcional)", placeholder="Ex: 12345",
+                                      key="avulsa_os")
 
-                col_s, col_c = st.columns(2)
-                with col_s:
-                    salvar = st.form_submit_button("Salvar", type="primary")
-                with col_c:
-                    cancelar = st.form_submit_button("Cancelar")
+                # ── Modo de cálculo (v2.3) ──
+                modo_calculo = st.radio(
+                    "Modo de cálculo",
+                    options=["Automático", "Valor Fixo"],
+                    horizontal=True,
+                    key="avulsa_modo",
+                    help="Automático: Valor Faturado × Percentual. "
+                         "Valor Fixo: informe diretamente o valor da comissão.",
+                )
+
+            with col2:
+                valor_fat = st.number_input("Valor faturado", min_value=0.0,
+                                            step=100.0, format="%.2f",
+                                            key="avulsa_valor_fat")
+                percentual = st.number_input("Percentual (%)", min_value=0.0,
+                                             max_value=100.0, step=0.5,
+                                             format="%.2f",
+                                             key="avulsa_pct")
+                data_prev = st.date_input("Data prevista pagamento",
+                                          value=hoje, key="avulsa_data")
+                obs = st.text_area("Observacoes", height=70, key="avulsa_obs")
+
+                # ── Valor da Comissão ──
+                modo_automatico = modo_calculo == "Automático"
+                if modo_automatico:
+                    # Cálculo em tempo real (sem salvar)
+                    valor_com = round(valor_fat * (percentual / 100), 2)
+                    st.metric("Valor Comissão", f"R$ {valor_com:,.2f}",
+                              help="Recalculado automaticamente ao alterar Valor Faturado ou Percentual.")
+                else:
+                    valor_com = st.number_input(
+                        "Valor Comissão (fixo)",
+                        min_value=0.0,
+                        step=100.0,
+                        format="%.2f",
+                        key="avulsa_valor_fixo",
+                        help="Valor fixo informado manualmente. O cálculo automático é ignorado.",
+                    )
+
+            col_s, col_c = st.columns(2)
+            with col_s:
+                salvar = st.button("Salvar", type="primary", width="stretch",
+                                   key="avulsa_salvar")
+            with col_c:
+                cancelar = st.button("Cancelar", width="stretch",
+                                     key="avulsa_cancelar")
 
             if salvar:
                 if not p_sel or not descricao:
                     st.error("Parceiro e descricao sao obrigatorios.")
                 else:
-                    valor_com = round(valor_fat * (percentual / 100), 2)
+                    modo_salvar = "AUTOMATICO" if modo_automatico else "FIXO"
                     dados = {
                         "parceiro_id": p_id,
                         "cliente_id": c_id,
@@ -86,6 +120,7 @@ def render():
                         "valor_comissao": valor_com,
                         "data_prevista": data_prev.isoformat(),
                         "observacoes": obs,
+                        "modo_calculo": modo_salvar,
                     }
                     criar_comissao_avulsa(dados)
                     mensagem_sucesso("Comissao avulsa criada!")
@@ -111,6 +146,7 @@ def render():
 
     dados = []
     for a in avulsas:
+        modo_exib = "Automática" if a.get("modo_calculo", "AUTOMATICO") == "AUTOMATICO" else "Manual"
         dados.append({
             "ID": a["id"],
             "Parceiro": a["parceiro_nome"],
@@ -119,6 +155,7 @@ def render():
             "Valor Fat.": f"R$ {a['valor_faturado']:,.2f}",
             "%": f"{a['percentual']:.1f}%",
             "Comissao": f"R$ {a['valor_comissao']:,.2f}",
+            "Modo": modo_exib,
             "Data Prev.": a["data_prevista"] or "-",
             "Status": a["status"],
         })

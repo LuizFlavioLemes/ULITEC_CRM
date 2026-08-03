@@ -137,8 +137,8 @@ def _exibir_card_pendencia(row, key_prefix="pend"):
                 "💾 Salvar alterações",
                 key=f"salvar_{key_prefix}_{row['id']}",
             )
-            concluir_click = col_a2.button(
-                "✅ Concluir",
+            finalizar_click = col_a2.button(
+                "✅ Finalizar Pendência",
                 key=f"conc_{key_prefix}_{row['id']}",
             )
 
@@ -160,18 +160,47 @@ def _exibir_card_pendencia(row, key_prefix="pend"):
                 except Exception as e:
                     st.error(f"❌ Erro ao atualizar: {e}")
 
-            if concluir_click:
-                try:
-                    concluir_pendencia_com_evolucao(
-                        pendencia_id=row["id"],
-                        usuario_id=st.session_state.get("usuario_id"),
-                        usuario_nome=st.session_state.get("usuario_nome", ""),
-                        observacao=nova_desc if nova_desc != row["descricao"] else "",
+            # ── CONFIRMAÇÃO DE FINALIZAÇÃO ──
+            conf_key = f"confirmar_finalizar_{key_prefix}_{row['id']}"
+
+            if finalizar_click:
+                st.session_state[conf_key] = True
+
+            if st.session_state.get(conf_key, False):
+                with st.container(border=True):
+                    st.warning(
+                        "❗ Deseja realmente finalizar esta pendência?\n\n"
+                        "Após finalizar ela deixará de aparecer na agenda comercial "
+                        "e será registrada como concluída."
                     )
-                    st.success("✅ Pendência concluída!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Erro ao concluir: {e}")
+                    col_c1, col_c2 = st.columns(2)
+                    with col_c1:
+                        if st.button(
+                            "✅ Finalizar Pendência",
+                            type="primary",
+                            width="stretch",
+                            key=f"confirmar_conc_{key_prefix}_{row['id']}",
+                        ):
+                            try:
+                                concluir_pendencia_com_evolucao(
+                                    pendencia_id=row["id"],
+                                    usuario_id=st.session_state.get("usuario_id"),
+                                    usuario_nome=st.session_state.get("usuario_nome", ""),
+                                    observacao=nova_desc if nova_desc != row["descricao"] else "",
+                                )
+                                st.session_state.pop(conf_key, None)
+                                st.success("Pendência finalizada com sucesso.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Erro ao finalizar: {e}")
+                    with col_c2:
+                        if st.button(
+                            "Cancelar",
+                            width="stretch",
+                            key=f"cancelar_conc_{key_prefix}_{row['id']}",
+                        ):
+                            st.session_state.pop(conf_key, None)
+                            st.rerun()
 
         if row["status"] == "FECHADA":
             with st.expander("🔄 Reabrir pendência", expanded=False):

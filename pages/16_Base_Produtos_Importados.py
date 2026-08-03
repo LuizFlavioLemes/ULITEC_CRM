@@ -267,7 +267,7 @@ def buscar_ofertas_por_produto(produto_id):
         SELECT of.id AS oferta_id, of.produto_id, of.fornecedor_id,
                f.nome AS fornecedor, f.pais AS pais_fornecedor,
                of.fob_atual_usd, of.data_fob, of.observacoes,
-               of.ativo
+               of.ativo, of.principal
         FROM produtos_importados_fornecedores of
         INNER JOIN fornecedores_produto f ON of.fornecedor_id = f.id
         WHERE of.produto_id = ? AND of.ativo = 1 AND f.ativo = 1
@@ -276,6 +276,120 @@ def buscar_ofertas_por_produto(produto_id):
     df = pd.read_sql(query, conn, params=(produto_id,))
     conn.close()
     return df
+
+def definir_oferta_principal(oferta_id, produto_id, usuario_id=None):
+    """
+    Define uma oferta como Oferta Principal do produto.
+    Desmarca qualquer outra oferta principal do mesmo produto.
+    Nunca permite duas ofertas principais simultâneas.
+    """
+    conn = get_conn()
+    try:
+        # 1. Verificar se a oferta existe e pertence ao produto
+        oferta = conn.execute("""
+            SELECT id FROM produtos_importados_fornecedores
+            WHERE id = ? AND produto_id = ? AND ativo = 1
+        """, (oferta_id, produto_id)).fetchone()
+        if not oferta:
+            conn.close()
+            return False, "Oferta não encontrada."
+
+        # 2. Desmarcar qualquer oferta principal anterior do mesmo produto
+        conn.execute("""
+            UPDATE produtos_importados_fornecedores
+            SET principal = 0, atualizado_em = date('now')
+            WHERE produto_id = ? AND principal = 1
+        """, (produto_id,))
+
+        # 3. Marcar a oferta selecionada como principal
+        conn.execute("""
+            UPDATE produtos_importados_fornecedores
+            SET principal = 1, atualizado_em = date('now')
+            WHERE id = ? AND produto_id = ?
+        """, (oferta_id, produto_id))
+
+        # 4. Registrar histórico
+        if usuario_id:
+            nome_fornecedor = conn.execute("""
+                SELECT f.nome FROM produtos_importados_fornecedores of
+                INNER JOIN fornecedores_produto f ON of.fornecedor_id = f.id
+                WHERE of.id = ?
+            """, (oferta_id,)).fetchone()
+            if nome_fornecedor:
+                conn.execute("""
+                    INSERT INTO produtos_importados_historico
+                    (produto_id, fornecedor, valor_fob_usd, data_atualizacao, usuario_id, observacao)
+                    VALUES (?, ?, NULL, date('now'), ?, 'Definida como Oferta Principal')
+                """, (produto_id, nome_fornecedor[0], usuario_id))
+
+        conn.commit()
+        conn.close()
+        return True, "Oferta principal definida com sucesso!"
+    except Exception as e:
+        conn.close()
+        return False, str(e)
+
+def buscar_oferta_principal(produto_id):
+    """
+    Retorna a Oferta Principal de um produto.
+    Se nenhuma oferta estiver marcada como principal,
+    retorna a oferta de MAIOR FOB (fallback).
+    """
+    conn = get_conn()
+    try:
+        # 1. Tenta a oferta marcada como principal
+        row = conn.execute("""
+            SELECT of.id AS oferta_id, of.produto_id, of.fornecedor_id,
+                   f.nome AS fornecedor, f.pais AS pais_fornecedor,
+                   of.fob_atual_usd, of.data_fob, of.observacoes, of.principal
+            FROM produtos_importados_fornecedores of
+            INNER JOIN fornecedores_produto f ON of.fornecedor_id = f.id
+            WHERE of.produto_id = ? AND of.ativo = 1 AND f.ativo = 1
+              AND of.principal = 1
+            ORDER BY of.fob_atual_usd ASC
+            LIMIT 1
+        """, (produto_id,)).fetchone()
+        if row:
+            conn.close()
+            return {
+                "oferta_id": row[0],
+                "produto_id": row[1],
+                "fornecedor_id": row[2],
+                "fornecedor": row[3],
+                "pais_fornecedor": row[4],
+                "fob_atual_usd": row[5],
+                "data_fob": row[6],
+                "observacoes": row[7],
+                "principal": row[8],
+            }
+
+        # 2. Fallback: maior FOB
+        row = conn.execute("""
+            SELECT of.id AS oferta_id, of.produto_id, of.fornecedor_id,
+                   f.nome AS fornecedor, f.pais AS pais_fornecedor,
+                   of.fob_atual_usd, of.data_fob, of.observacoes, of.principal
+            FROM produtos_importados_fornecedores of
+            INNER JOIN fornecedores_produto f ON of.fornecedor_id = f.id
+            WHERE of.produto_id = ? AND of.ativo = 1 AND f.ativo = 1
+            ORDER BY of.fob_atual_usd DESC
+            LIMIT 1
+        """, (produto_id,)).fetchone()
+        conn.close()
+        if row:
+            return {
+                "oferta_id": row[0],
+                "produto_id": row[1],
+                "fornecedor_id": row[2],
+                "fornecedor": row[3],
+                "pais_fornecedor": row[4],
+                "fob_atual_usd": row[5],
+                "data_fob": row[6],
+                "observacoes": row[7],
+                "principal": row[8],
+            }
+    except Exception:
+        conn.close()
+    return None
 
 def buscar_oferta_por_produto_fornecedor(produto_id, fornecedor_id):
     """Verifica se existe oferta para produto+fornecedor."""
@@ -1038,22 +1152,26 @@ with abas[1]:
                         else:
                             ii_pct = ipi_pct = pis_pct = cofins_pct = icms_pct = 0
 
-                        # Usar o menor FOB para o cálculo de nacionalização
-                        ofertas_prod = buscar_ofertas_por_produto(row['id'])
-                        if not ofertas_prod.empty:
-                            menor_fob = ofertas_prod['fob_atual_usd'].min()
+                        # Usar a Oferta Principal para o cálculo de nacionalização.
+                        # Caso nenhuma esteja marcada como principal, usa a maior oferta (fallback).
+                        oferta_principal = buscar_oferta_principal(row['id'])
+                        if oferta_principal:
+                            fob_calculo = oferta_principal['fob_atual_usd'] or 0
+                            oferta_rotulo = oferta_principal['fornecedor']
                         else:
-                            menor_fob = 0
+                            fob_calculo = 0
+                            oferta_rotulo = "—"
 
                         calculo = calcular_nacionalizacao(
-                            menor_fob,
+                            fob_calculo,
                             frete_rateado,
                             dolar,
                             ii_pct, ipi_pct, pis_pct, cofins_pct, icms_pct,
                             despesas_aduaneiras,
                         )
 
-                        st.markdown("#### 📐 Nacionalização (menor FOB)")
+                        st.markdown("#### 📐 Nacionalização (Oferta Principal)")
+                        st.caption(f"Fornecedor: **{oferta_rotulo}**")
                         st.metric(
                             "✅ Valor Nacionalizado Final",
                             f"R$ {calculo['valor_nacionalizado']:.2f}",
@@ -1062,12 +1180,13 @@ with abas[1]:
                         st.markdown("#### 🎯 Markup Personalizado")
                         mk_personalizado = st.number_input(
                             "Markup",
-                            min_value=1.0,
+                            min_value=1.90,
                             max_value=10.0,
-                            value=float(markup_padrao),
+                            value=max(float(markup_padrao), 1.90),
                             step=0.05,
                             format="%.2f",
                             key=f"mk_{row['id']}",
+                            help="Markup mínimo permitido: 1,90.",
                         )
                         preco_personalizado = calculo["valor_nacionalizado"] * mk_personalizado
                         st.metric(
@@ -1080,8 +1199,10 @@ with abas[1]:
                     ofertas = buscar_ofertas_por_produto(row['id'])
 
                     if not ofertas.empty:
-                        # Destacar menor FOB
-                        menor_fob_val = ofertas['fob_atual_usd'].min()
+                        # Identificar Oferta Principal
+                        oferta_principal_id = None
+                        if oferta_principal:
+                            oferta_principal_id = oferta_principal['oferta_id']
 
                         # Cabeçalho da tabela
                         col_f1, col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns([2, 1, 1, 2, 0.5, 1])
@@ -1105,8 +1226,8 @@ with abas[1]:
 
                             with col_f1:
                                 nome_forn = of['fornecedor']
-                                if of['fob_atual_usd'] == menor_fob_val:
-                                    st.markdown(f"🏆 **{nome_forn}**")
+                                if of.get('principal') == 1:
+                                    st.markdown(f"⭐ **{nome_forn}**")
                                 else:
                                     st.markdown(nome_forn)
 
@@ -1120,10 +1241,29 @@ with abas[1]:
                                 st.markdown(of['observacoes'] if of['observacoes'] else "")
 
                             with col_f5:
-                                if of['fob_atual_usd'] == menor_fob_val:
-                                    st.markdown("🏆")
+                                if of.get('principal') == 1:
+                                    st.markdown("⭐")
 
                             with col_f6:
+                                # Botão Definir como Oferta Principal
+                                principal_key = f"principal_{of['oferta_id']}"
+                                if st.button(
+                                    "⭐ Definir Principal",
+                                    key=principal_key,
+                                    help="Definir como Oferta Principal deste produto",
+                                    disabled=bool(of.get('principal') == 1),
+                                ):
+                                    sucesso_princ, msg_princ = definir_oferta_principal(
+                                        int(of['oferta_id']),
+                                        int(row['id']),
+                                        usuario_id,
+                                    )
+                                    if sucesso_princ:
+                                        st.success(msg_princ)
+                                        st.rerun()
+                                    else:
+                                        st.error(msg_princ)
+
                                 # Botão Editar
                                 editar_key = f"editar_{of['oferta_id']}"
                                 if st.button("✏️", key=editar_key, help="Editar oferta"):
@@ -1152,6 +1292,16 @@ with abas[1]:
                             st.markdown("---")
                             st.markdown(f"### ✏️ Editar Oferta: {st.session_state['editar_oferta_fornecedor']}")
                             st.caption("Apenas dados da oferta (FOB, data, observações) — dados do produto não são alterados.")
+
+                            # Checkbox: Definir como Oferta Principal
+                            principal_atual = buscar_oferta_principal(row['id'])
+                            eh_principal = principal_atual is not None and principal_atual['oferta_id'] == oferta_id_edit
+                            definir_principal = st.checkbox(
+                                "☑️ Definir como Oferta Principal",
+                                value=eh_principal,
+                                key=f"editar_principal_{oferta_id_edit}",
+                                help="Ao selecionar, esta oferta passa a ser a Oferta Principal e a anterior deixa de ser.",
+                            )
 
                             col_ed1, col_ed2 = st.columns(2)
                             with col_ed1:
@@ -1187,6 +1337,12 @@ with abas[1]:
                                         usuario_id,
                                     )
                                     if sucesso:
+                                        if definir_principal:
+                                            sucesso_princ, msg_princ = definir_oferta_principal(
+                                                int(oferta_id_edit),
+                                                int(row['id']),
+                                                usuario_id,
+                                            )
                                         st.success(msg)
                                         del st.session_state["editar_oferta_id"]
                                         del st.session_state["editar_oferta_fornecedor"]
@@ -1868,11 +2024,12 @@ with abas[4]:
         )
         markup_padrao = st.number_input(
             "Markup Padrão",
-            min_value=1.0,
-            value=float(configs.get("markup_padrao", 2.0)),
+            min_value=1.90,
+            value=max(float(configs.get("markup_padrao", 2.0)), 1.90),
             step=0.1,
             format="%.2f",
             key="cfg_markup",
+            help="Markup mínimo permitido: 1,90.",
         )
 
     if st.button("💾 Salvar Configurações", type="primary", width="stretch"):

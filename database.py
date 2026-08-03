@@ -668,6 +668,19 @@ CREATE TABLE IF NOT EXISTS clientes (
         except Exception:
             pass
 
+    # ==================================================
+    # MIGRACAO v2.2: campos de brinde detalhado
+    # ==================================================
+    for coluna_brinde in [
+        ('entregou_brinde', 'TEXT'),
+        ('descricao_brinde', 'TEXT'),
+        ('data_brinde', 'DATE'),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE interacoes ADD COLUMN {coluna_brinde[0]} {coluna_brinde[1]}")
+        except Exception:
+            pass
+
     # Renomear coluna antiga 'status' para 'status_interacao' se existir
     try:
         colunas_inter = [row[1] for row in cursor.execute("PRAGMA table_info(interacoes)").fetchall()]

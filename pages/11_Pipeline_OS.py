@@ -211,9 +211,12 @@ with tab1:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
+        opcoes_status = sorted(
+            set(df["status"].dropna().unique()) | set(STATUS_OS)
+        )
         filtro_status = st.multiselect(
             "Status",
-            sorted(df["status"].dropna().unique()),
+            opcoes_status,
             default=sorted(df["status"].dropna().unique())
         )
 

@@ -186,10 +186,10 @@ def criar_comissao_avulsa(dados: dict) -> int:
         INSERT INTO comissoes_avulsas
             (parceiro_id, cliente_id, os_id, descricao,
              valor_faturado, percentual, valor_comissao,
-             data_prevista, observacoes)
+             data_prevista, observacoes, modo_calculo)
         VALUES (?, ?, ?, ?,
                 ?, ?, ?,
-                ?, ?)
+                ?, ?, ?)
     """, (
         dados.get("parceiro_id"),
         dados.get("cliente_id"),
@@ -200,6 +200,7 @@ def criar_comissao_avulsa(dados: dict) -> int:
         float(dados.get("valor_comissao", 0)),
         dados.get("data_prevista"),
         dados.get("observacoes", ""),
+        dados.get("modo_calculo", "AUTOMATICO"),
     ))
     avulsa_id = cursor.lastrowid
     conn.commit()
@@ -220,6 +221,7 @@ def atualizar_comissao_avulsa(avulsa_id: int, dados: dict):
             valor_comissao = ?,
             data_prevista = ?,
             observacoes = ?,
+            modo_calculo = ?,
             atualizado_em = date('now')
         WHERE id = ?
     """, (
@@ -231,6 +233,7 @@ def atualizar_comissao_avulsa(avulsa_id: int, dados: dict):
         float(dados.get("valor_comissao", 0)),
         dados.get("data_prevista"),
         dados.get("observacoes", ""),
+        dados.get("modo_calculo", "AUTOMATICO"),
         avulsa_id,
     ))
     conn.commit()

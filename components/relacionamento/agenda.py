@@ -10,12 +10,61 @@ Responsabilidades:
 - Renderizar tabela de agenda com cores
 """
 
-from datetime import date
+from datetime import date, datetime, timedelta
 
 import streamlit as st
 import pandas as pd
 
 from services.relacionamento import get_agenda
+
+
+def _proximo_dia_util(d: date) -> date:
+    """Retorna o próximo dia útil (segunda a sexta) após a data informada."""
+    proximo = d + timedelta(days=1)
+    while proximo.weekday() >= 5:  # 5 = sábado, 6 = domingo
+        proximo += timedelta(days=1)
+    return proximo
+
+
+def obter_cor_pendencia(data_limite):
+    """
+    Determina a cor de exibição de uma pendência na agenda com base na urgência.
+
+    Padrão de cores:
+        - Vermelho: pendências vencidas
+        - Azul:     pendências que vencem HOJE
+        - Amarelo:  pendências que vencem no PRÓXIMO DIA ÚTIL
+        - Padrão:   demais pendências (sem coloração)
+
+    Regras:
+        - Considera apenas dias úteis (segunda a sexta).
+        - Ignora sábado e domingo.
+        - Não considera feriados nacionais nesta versão.
+
+    Parâmetros:
+        data_limite: Data limite da pendência (date ou str "YYYY-MM-DD").
+
+    Retorna:
+        Tupla (cor_fundo, cor_texto) ou None se não houver coloração especial.
+    """
+    if data_limite is None:
+        return None
+
+    if isinstance(data_limite, str):
+        data_limite = datetime.strptime(data_limite[:10], "%Y-%m-%d").date()
+    elif isinstance(data_limite, datetime):
+        # Cobre datetime.datetime e pd.Timestamp (subclasse de datetime)
+        data_limite = data_limite.date()
+
+    hoje = date.today()
+
+    if data_limite < hoje:
+        return ("#f8d7da", "#721c24")  # Vermelho — vencida
+    if data_limite == hoje:
+        return ("#cce5ff", "#004085")  # Azul — vence hoje
+    if data_limite == _proximo_dia_util(hoje):
+        return ("#fff3cd", "#856404")  # Amarelo — próximo dia útil
+    return None
 
 
 def exibir_agenda():
@@ -80,11 +129,11 @@ def exibir_agenda():
         st.divider()
 
         def cor_status(row):
-            if row["status"] == "VENCIDA":
-                return ["background-color: #f8d7da; color: #721c24"] * len(row)
-            elif row["status"] == "HOJE":
-                return ["background-color: #fff3cd; color: #856404"] * len(row)
-            return [""] * len(row)
+            cor = obter_cor_pendencia(row["data_prevista"])
+            if cor is None:
+                return [""] * len(row)
+            fundo, texto = cor
+            return [f"background-color: {fundo}; color: {texto}"] * len(row)
 
         st.dataframe(
             df_agenda.style.apply(cor_status, axis=1),
